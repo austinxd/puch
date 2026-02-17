@@ -34,10 +34,15 @@ class ChatView(APIView):
         reply = response['text']
         media = response['media']
 
+        # Save assistant message (include media URLs for admin visibility)
+        saved_content = reply
+        if media:
+            media_lines = '\n'.join(f'[media:{item["type"]}]{item["url"]}[/media]' for item in media)
+            saved_content = f"{reply}\n{media_lines}"
         ChatMessage.objects.create(
             conversation=conversation,
             role=ChatMessage.Role.ASSISTANT,
-            content=reply,
+            content=saved_content,
         )
 
         return Response({
