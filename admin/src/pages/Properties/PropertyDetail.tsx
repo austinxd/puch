@@ -2,6 +2,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../api/client'
 
+interface PropertyImage {
+  id: number
+  image: string
+  order: number
+}
+
+interface PropertyVideo {
+  id: number
+  video: string
+}
+
 interface Property {
   id: number
   identificador: string
@@ -34,12 +45,8 @@ interface Property {
   parametros_usos: string
   financiamiento: string
   link_maps: string
-  imagen_1: string
-  imagen_2: string
-  imagen_3: string
-  imagen_4: string
-  imagen_5: string
-  video: string
+  images: PropertyImage[]
+  videos: PropertyVideo[]
   recorrido_360: string
   activo: boolean
   agent_name: string
@@ -67,7 +74,7 @@ export default function PropertyDetail() {
 
   if (!property) return <p className="text-gray-500">Cargando...</p>
 
-  const images = [property.imagen_1, property.imagen_2, property.imagen_3, property.imagen_4, property.imagen_5].filter(Boolean)
+  const images = property.images.map((i) => i.image)
 
   return (
     <div>
@@ -188,17 +195,15 @@ export default function PropertyDetail() {
         </div>
       )}
 
-      {(property.video || property.recorrido_360) && (
+      {(property.videos.length > 0 || property.recorrido_360) && (
         <div className="mt-8 bg-white rounded-lg shadow p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Medios</h3>
-          <div className="flex gap-4">
-            {property.video && (
-              <a href={property.video} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm">
-                Ver Video
-              </a>
+          <div className="space-y-4">
+            {property.videos[0] && (
+              <video src={property.videos[0].video} controls className="rounded-lg max-h-64" />
             )}
             {property.recorrido_360 && (
-              <a href={property.recorrido_360} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm">
+              <a href={property.recorrido_360} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm block">
                 Recorrido 360
               </a>
             )}

@@ -30,7 +30,9 @@ class ChatView(APIView):
             content=message,
         )
 
-        reply = get_chat_response(conversation, message)
+        response = get_chat_response(conversation, message)
+        reply = response['text']
+        media = response['media']
 
         ChatMessage.objects.create(
             conversation=conversation,
@@ -41,6 +43,7 @@ class ChatView(APIView):
         return Response({
             'session_id': session_id,
             'reply': reply,
+            'media': media,
         })
 
 

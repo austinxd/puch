@@ -1,10 +1,13 @@
 import json
 import re
 import logging
+from datetime import date
+
 from django.conf import settings
 from django.db.models import Q
 from openai import OpenAI
-from properties.models import Property
+from properties.models import Property, Agent
+from properties.calendar_service import check_availability, create_appointment
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +87,11 @@ Siempre usa este formato:
 Mensaje separado: "[Dirección]"
 Mensaje separado: "[Link Maps]"
 
-Para medios, comparte las URLs directamente.
+Para medios, usa la función send_property_media para enviar imágenes y videos.
 Si hay múltiples opciones, presenta resumen con: [Calle], [Precio], [Metraje], [Habitaciones], [Baños].
 
 === MANEJO DE MEDIOS ===
+- Para enviar imágenes o videos de una propiedad, SIEMPRE usa la función send_property_media.
 - Si una propiedad NO tiene imágenes: NO digas que no tienes. Sugiere automáticamente el recorrido 360 o video.
 - NUNCA muestres imágenes de otra propiedad.
 - Si ya mostraste una propiedad en la conversación, no la vuelvas a mostrar completa.
@@ -98,6 +102,19 @@ Si hay múltiples opciones, presenta resumen con: [Calle], [Precio], [Metraje], 
 Si el cliente hace una oferta o pregunta si el precio es negociable:
 "Todas las propiedades han sido cuidadosamente evaluadas para colocarse en un rango de precio de acuerdo al mercado, pero sí tenemos un margen que podríamos sentarnos a conversar en caso de que exista una propuesta seria."
 Luego continúa con el flujo normal.
+
+=== AGENDAMIENTO DE VISITAS ===
+La fecha de hoy es {current_date}.
+Cuando el cliente quiera agendar una visita:
+1. Pregunta qué fecha le conviene (si no la dio ya). Resuelve expresiones como "mañana", "el viernes", "la próxima semana" a fechas concretas usando la fecha de hoy.
+2. Usa la función check_availability para verificar horarios disponibles en esa fecha.
+3. Presenta los horarios disponibles al cliente y pídele que elija uno.
+4. Pide su nombre completo (si aún no lo tienes) y número de teléfono.
+5. Usa la función create_appointment para crear la cita.
+6. Confirma la cita con los detalles: fecha, hora, propiedad y dirección.
+
+Si el agente de la propiedad NO tiene calendario conectado, di:
+"Te voy a conectar con [nombre del agente] para coordinar la visita directamente. Su número es [teléfono del agente]."
 
 === REGLAS CRÍTICAS ===
 - NUNCA recomiendes CPLJ01 a menos que el cliente pregunte específicamente por ella.
@@ -146,18 +163,24 @@ def search_properties(message):
         except ValueError:
             pass
 
-    properties = Property.objects.filter(query & keyword_filter).select_related('agent')[:5]
+    properties = Property.objects.filter(query & keyword_filter).select_related('agent').prefetch_related('images', 'videos')[:5]
 
     if not properties.exists() and keywords:
         broad_filter = Q()
         for kw in keywords[:3]:
             broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw) | Q(identificador__icontains=kw)
-        properties = Property.objects.filter(query & broad_filter).select_related('agent')[:5]
+        properties = Property.objects.filter(query & broad_filter).select_related('agent').prefetch_related('images', 'videos')[:5]
 
     if not properties.exists():
-        properties = Property.objects.filter(activo=True).select_related('agent')[:5]
+        properties = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')[:5]
 
     return properties
+
+
+def _get_media_url(file_field):
+    """Build an absolute URL for a media file."""
+    base_url = getattr(settings, 'BASE_URL', 'https://api.brikia.tech')
+    return f"{base_url}{file_field.url}"
 
 
 def format_property(prop):
@@ -193,15 +216,16 @@ def format_property(prop):
         f"  Financiamiento: {prop.financiamiento}" if prop.financiamiento else "",
         f"  Agente: {prop.agent.name} (Tel: {prop.agent.phone}, Email: {prop.agent.email})" if prop.agent else "",
     ]
-    images = [url for url in [prop.imagen_1, prop.imagen_2, prop.imagen_3, prop.imagen_4, prop.imagen_5] if url]
+    images = list(prop.images.all())
     if images:
         lines.append(f"  Imágenes disponibles: SÍ ({len(images)} imágenes)")
-        for i, url in enumerate(images, 1):
-            lines.append(f"    Imagen {i}: {url}")
+        for i, img in enumerate(images, 1):
+            lines.append(f"    Imagen {i}: {_get_media_url(img.image)}")
     else:
         lines.append("  Imágenes disponibles: NO")
-    if prop.video:
-        lines.append(f"  Video disponible: SÍ → {prop.video}")
+    video = prop.videos.first()
+    if video:
+        lines.append(f"  Video disponible: SÍ → {_get_media_url(video.video)}")
     else:
         lines.append("  Video disponible: NO")
     if prop.recorrido_360:
@@ -210,6 +234,177 @@ def format_property(prop):
         lines.append("  Recorrido 360 disponible: NO")
 
     return '\n'.join(line for line in lines if line)
+
+
+CALENDAR_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "check_availability",
+            "description": "Verifica los horarios disponibles de un agente para una fecha específica. Usa esto cuando el cliente quiera agendar una visita.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "property_identifier": {
+                        "type": "string",
+                        "description": "El identificador de la propiedad (ej: JC980, ST355)",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Fecha en formato YYYY-MM-DD",
+                    },
+                    "time": {
+                        "type": "string",
+                        "description": "Hora específica en formato HH:MM (opcional, para verificar un horario puntual)",
+                    },
+                },
+                "required": ["property_identifier", "date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_appointment",
+            "description": "Crea una cita para visitar una propiedad. Solo usar cuando el cliente haya confirmado fecha, hora y datos de contacto.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "property_identifier": {
+                        "type": "string",
+                        "description": "El identificador de la propiedad (ej: JC980, ST355)",
+                    },
+                    "client_name": {
+                        "type": "string",
+                        "description": "Nombre completo del cliente",
+                    },
+                    "client_phone": {
+                        "type": "string",
+                        "description": "Número de teléfono del cliente",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Fecha en formato YYYY-MM-DD",
+                    },
+                    "time": {
+                        "type": "string",
+                        "description": "Hora en formato HH:MM",
+                    },
+                },
+                "required": ["property_identifier", "client_name", "client_phone", "date", "time"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_property_media",
+            "description": "Envía las fotos y/o video de una propiedad al cliente. Usa esto cuando el cliente quiera ver fotos, imágenes o video de una propiedad.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "property_identifier": {
+                        "type": "string",
+                        "description": "El identificador de la propiedad (ej: JC980, ST355)",
+                    },
+                    "media_type": {
+                        "type": "string",
+                        "enum": ["images", "video", "all"],
+                        "description": "Tipo de media a enviar: 'images' para fotos, 'video' para video, 'all' para ambos",
+                    },
+                },
+                "required": ["property_identifier", "media_type"],
+            },
+        },
+    },
+]
+
+
+def _has_calendar_agents(properties):
+    """Check if any property in the list has an agent with Google Calendar connected."""
+    for prop in properties:
+        if prop.agent and prop.agent.google_calendar_connected:
+            return True
+    return False
+
+
+def execute_tool(tool_name, arguments, session_id=''):
+    """Execute a tool call and return the result."""
+    if tool_name == 'check_availability':
+        prop_id = arguments.get('property_identifier', '')
+        try:
+            prop = Property.objects.select_related('agent').get(identificador=prop_id)
+        except Property.DoesNotExist:
+            return json.dumps({'error': f'Propiedad {prop_id} no encontrada'}), []
+
+        if not prop.agent:
+            return json.dumps({'error': f'La propiedad {prop_id} no tiene agente asignado'}), []
+
+        if not prop.agent.google_calendar_connected:
+            return json.dumps({
+                'error': 'calendar_not_connected',
+                'agent_name': prop.agent.name,
+                'agent_phone': prop.agent.phone,
+            }), []
+
+        result = check_availability(
+            agent_id=prop.agent.id,
+            date_str=arguments.get('date', ''),
+            time_str=arguments.get('time'),
+        )
+        return json.dumps(result), []
+
+    elif tool_name == 'create_appointment':
+        prop_id = arguments.get('property_identifier', '')
+        try:
+            prop = Property.objects.select_related('agent').get(identificador=prop_id)
+        except Property.DoesNotExist:
+            return json.dumps({'error': f'Propiedad {prop_id} no encontrada'}), []
+
+        if not prop.agent:
+            return json.dumps({'error': f'La propiedad {prop_id} no tiene agente asignado'}), []
+
+        if not prop.agent.google_calendar_connected:
+            return json.dumps({
+                'error': 'calendar_not_connected',
+                'agent_name': prop.agent.name,
+                'agent_phone': prop.agent.phone,
+            }), []
+
+        result = create_appointment(
+            agent_id=prop.agent.id,
+            property_id=prop_id,
+            client_name=arguments.get('client_name', ''),
+            client_phone=arguments.get('client_phone', ''),
+            date_str=arguments.get('date', ''),
+            time_str=arguments.get('time', ''),
+            session_id=session_id,
+        )
+        return json.dumps(result), []
+
+    elif tool_name == 'send_property_media':
+        prop_id = arguments.get('property_identifier', '')
+        media_type = arguments.get('media_type', 'all')
+        try:
+            prop = Property.objects.prefetch_related('images', 'videos').get(identificador=prop_id)
+        except Property.DoesNotExist:
+            return json.dumps({'error': f'Propiedad {prop_id} no encontrada'}), []
+
+        media = []
+        if media_type in ('images', 'all'):
+            for img in prop.images.all():
+                media.append({'type': 'image', 'url': _get_media_url(img.image)})
+        if media_type in ('video', 'all'):
+            video = prop.videos.first()
+            if video:
+                media.append({'type': 'video', 'url': _get_media_url(video.video)})
+
+        result_msg = f"Se enviarán {len(media)} archivos multimedia de la propiedad {prop_id}."
+        if not media:
+            result_msg = f"La propiedad {prop_id} no tiene {'imágenes' if media_type == 'images' else 'video' if media_type == 'video' else 'medios'} disponibles."
+        return json.dumps({'message': result_msg, 'media_count': len(media)}), media
+
+    return json.dumps({'error': f'Función desconocida: {tool_name}'}), []
 
 
 def extract_intent(conversation):
@@ -273,9 +468,12 @@ Responde SOLO el JSON, sin markdown ni explicación."""
 
 
 def get_chat_response(conversation, user_message):
-    """Generate a chat response using OpenAI."""
+    """Generate a chat response using OpenAI with optional tool calling for calendar and media."""
     if not settings.OPENAI_API_KEY:
-        return "Lo siento, el servicio de chat no está configurado. Contacta al administrador."
+        return {
+            'text': "Lo siento, el servicio de chat no está configurado. Contacta al administrador.",
+            'media': [],
+        }
 
     history = conversation.messages.order_by('-created_at')[:10]
     history = list(reversed(history))
@@ -290,23 +488,61 @@ def get_chat_response(conversation, user_message):
             + "\n=== FIN DE PROPIEDADES ==="
         )
 
+    # Inject current date into the system prompt
+    system_prompt = SYSTEM_PROMPT.replace('{current_date}', date.today().strftime('%Y-%m-%d (%A)'))
+
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + property_context}
+        {"role": "system", "content": system_prompt + property_context}
     ]
     for msg in history[:-1]:
         messages.append({"role": msg.role, "content": msg.content})
     messages.append({"role": "user", "content": user_message})
 
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-        max_tokens=1000,
-        temperature=0.7,
-    )
 
-    reply = response.choices[0].message.content
+    # Always include tools (calendar + media)
+    api_kwargs = {
+        "model": "gpt-4o",
+        "messages": messages,
+        "max_tokens": 1000,
+        "temperature": 0.7,
+        "tools": CALENDAR_TOOLS,
+    }
+
+    response = client.chat.completions.create(**api_kwargs)
+    response_message = response.choices[0].message
+
+    # Tool calling loop: handle tool calls from the model
+    all_media = []
+    max_tool_rounds = 5
+    rounds = 0
+    while response_message.tool_calls and rounds < max_tool_rounds:
+        rounds += 1
+        messages.append(response_message)
+
+        for tool_call in response_message.tool_calls:
+            func_name = tool_call.function.name
+            try:
+                func_args = json.loads(tool_call.function.arguments)
+            except json.JSONDecodeError:
+                func_args = {}
+
+            logger.info(f"Tool call: {func_name}({func_args})")
+            result, media = execute_tool(func_name, func_args, session_id=conversation.session_id)
+            all_media.extend(media)
+            logger.info(f"Tool result: {result}")
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": result,
+            })
+
+        response = client.chat.completions.create(**api_kwargs)
+        response_message = response.choices[0].message
+
+    reply = response_message.content
 
     extract_intent(conversation)
 
-    return reply
+    return {'text': reply, 'media': all_media}

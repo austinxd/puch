@@ -104,6 +104,13 @@ STATICFILES_DIRS = [
     BASE_DIR.parent / 'admin' / 'dist',
 ]
 
+# Media files (uploaded images/videos)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Base URL for building absolute media URLs (used by chatbot/WhatsApp)
+BASE_URL = os.environ.get('BASE_URL', 'https://api.brikia.tech')
+
 STORAGES = {
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
@@ -130,6 +137,11 @@ REST_FRAMEWORK = {
 
 # OpenAI
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+
+# Google Calendar OAuth
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://api.brikia.tech/api/google/callback/')
 
 # WhatsApp Business
 WHATSAPP_VERIFY_TOKEN = os.environ.get('WHATSAPP_VERIFY_TOKEN', '')

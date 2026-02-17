@@ -13,6 +13,7 @@ interface Property {
   precio: string | null
   agent_name: string
   activo: boolean
+  first_image: string | null
 }
 
 export default function PropertyList() {

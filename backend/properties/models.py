@@ -5,6 +5,11 @@ class Agent(models.Model):
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=50, blank=True, default='')
     email = models.EmailField(blank=True, default='')
+    # Google Calendar OAuth
+    google_access_token = models.TextField(blank=True, default='')
+    google_refresh_token = models.TextField(blank=True, default='')
+    google_token_expiry = models.DateTimeField(null=True, blank=True)
+    google_calendar_connected = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['name']
@@ -54,12 +59,6 @@ class Property(models.Model):
     documentacion = models.TextField(blank=True, default='')
     parametros_usos = models.TextField(blank=True, default='')
     financiamiento = models.TextField(blank=True, default='')
-    imagen_1 = models.URLField(max_length=500, blank=True, default='')
-    imagen_2 = models.URLField(max_length=500, blank=True, default='')
-    imagen_3 = models.URLField(max_length=500, blank=True, default='')
-    imagen_4 = models.URLField(max_length=500, blank=True, default='')
-    imagen_5 = models.URLField(max_length=500, blank=True, default='')
-    video = models.URLField(max_length=500, blank=True, default='')
     recorrido_360 = models.CharField(max_length=500, blank=True, default='')
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -71,3 +70,53 @@ class Property(models.Model):
 
     def __str__(self):
         return f'{self.identificador} - {self.nombre}'
+
+
+class PropertyImage(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='properties/images/')
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+
+    def __str__(self):
+        return f'Image {self.id} for {self.property.identificador}'
+
+
+class PropertyVideo(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='videos')
+    video = models.FileField(upload_to='properties/videos/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'Video {self.id} for {self.property.identificador}'
+
+
+class Appointment(models.Model):
+    class Status(models.TextChoices):
+        SCHEDULED = 'scheduled', 'Programada'
+        CANCELLED = 'cancelled', 'Cancelada'
+        COMPLETED = 'completed', 'Completada'
+
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='appointments')
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='appointments')
+    client_name = models.CharField(max_length=200)
+    client_phone = models.CharField(max_length=50, blank=True, default='')
+    datetime_start = models.DateTimeField()
+    datetime_end = models.DateTimeField()
+    google_event_id = models.CharField(max_length=200, blank=True, default='')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    conversation_session_id = models.CharField(max_length=100, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-datetime_start']
+
+    def __str__(self):
+        return f'{self.client_name} - {self.property.identificador} ({self.datetime_start})'

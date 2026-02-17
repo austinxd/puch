@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../api/client'
 
 interface Agent {
   id: number
   name: string
+}
+
+interface PropertyImageData {
+  id: number
+  image: string
+  order: number
+}
+
+interface PropertyVideoData {
+  id: number
+  video: string
 }
 
 const INITIAL = {
@@ -39,12 +50,6 @@ const INITIAL = {
   documentacion: '',
   parametros_usos: '',
   financiamiento: '',
-  imagen_1: '',
-  imagen_2: '',
-  imagen_3: '',
-  imagen_4: '',
-  imagen_5: '',
-  video: '',
   recorrido_360: '',
   activo: true,
 }
@@ -69,6 +74,12 @@ export default function PropertyForm() {
   const [form, setForm] = useState<FormData>(INITIAL)
   const [agents, setAgents] = useState<Agent[]>([])
   const [saving, setSaving] = useState(false)
+  const [existingImages, setExistingImages] = useState<PropertyImageData[]>([])
+  const [existingVideos, setExistingVideos] = useState<PropertyVideoData[]>([])
+  const [newImages, setNewImages] = useState<File[]>([])
+  const [newVideo, setNewVideo] = useState<File | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.get('/agents/').then((res) => setAgents(res.data.results))
@@ -81,6 +92,8 @@ export default function PropertyForm() {
           agent: d.agent ?? '',
           precio: d.precio ?? '',
         })
+        setExistingImages(d.images || [])
+        setExistingVideos(d.videos || [])
       })
     }
   }, [id])
@@ -93,21 +106,69 @@ export default function PropertyForm() {
     }))
   }
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setNewImages((prev) => [...prev, ...Array.from(e.target.files!)])
+    }
+    if (imageInputRef.current) imageInputRef.current.value = ''
+  }
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewVideo(e.target.files[0])
+    }
+    if (videoInputRef.current) videoInputRef.current.value = ''
+  }
+
+  const removeNewImage = (index: number) => {
+    setNewImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const deleteExistingImage = async (imageId: number) => {
+    await api.delete(`/properties/${id}/images/${imageId}/`)
+    setExistingImages((prev) => prev.filter((img) => img.id !== imageId))
+  }
+
+  const deleteExistingVideo = async (videoId: number) => {
+    await api.delete(`/properties/${id}/videos/${videoId}/`)
+    setExistingVideos((prev) => prev.filter((v) => v.id !== videoId))
+  }
+
+  const uploadMedia = async (propertyId: number | string) => {
+    for (let i = 0; i < newImages.length; i++) {
+      const formData = new FormData()
+      formData.append('image', newImages[i])
+      formData.append('order', String(existingImages.length + i))
+      await api.post(`/properties/${propertyId}/images/`, formData)
+    }
+    if (newVideo) {
+      const formData = new FormData()
+      formData.append('video', newVideo)
+      await api.post(`/properties/${propertyId}/videos/`, formData)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    const payload = {
-      ...form,
-      agent: form.agent || null,
-      precio: form.precio || null,
+    try {
+      const payload = {
+        ...form,
+        agent: form.agent || null,
+        precio: form.precio || null,
+      }
+      let propertyId = id
+      if (isEdit) {
+        await api.put(`/properties/${id}/`, payload)
+      } else {
+        const res = await api.post('/properties/', payload)
+        propertyId = res.data.id
+      }
+      await uploadMedia(propertyId!)
+      navigate('/properties')
+    } finally {
+      setSaving(false)
     }
-    if (isEdit) {
-      await api.put(`/properties/${id}/`, payload)
-    } else {
-      await api.post('/properties/', payload)
-    }
-    setSaving(false)
-    navigate('/properties')
   }
 
   return (
@@ -248,25 +309,108 @@ export default function PropertyForm() {
         {/* Medios */}
         <section>
           <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Medios</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Field key={n} label={`Imagen ${n}`}>
-                <input
-                  name={`imagen_${n}`}
-                  value={(form as Record<string, unknown>)[`imagen_${n}`] as string}
-                  onChange={handleChange}
-                  placeholder="URL de la imagen"
-                  className={inputClass}
-                />
-              </Field>
-            ))}
-            <Field label="Video">
-              <input name="video" value={form.video} onChange={handleChange} placeholder="URL del video" className={inputClass} />
-            </Field>
-            <Field label="Recorrido 360">
-              <input name="recorrido_360" value={form.recorrido_360} onChange={handleChange} placeholder="URL recorrido 360" className={inputClass} />
-            </Field>
+
+          {/* Images */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+              {existingImages.map((img) => (
+                <div key={img.id} className="relative group">
+                  <img src={img.image} alt="" className="rounded-lg object-cover w-full h-32" />
+                  <button
+                    type="button"
+                    onClick={() => deleteExistingImage(img.id)}
+                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    X
+                  </button>
+                </div>
+              ))}
+              {newImages.map((file, i) => (
+                <div key={`new-${i}`} className="relative group">
+                  <img src={URL.createObjectURL(file)} alt="" className="rounded-lg object-cover w-full h-32" />
+                  <button
+                    type="button"
+                    onClick={() => removeNewImage(i)}
+                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    X
+                  </button>
+                  <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">Nueva</span>
+                </div>
+              ))}
+            </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+            >
+              + Agregar imágenes
+            </button>
           </div>
+
+          {/* Video */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Video</label>
+            {existingVideos.map((v) => (
+              <div key={v.id} className="flex items-center gap-3 mb-2">
+                <video src={v.video} className="rounded-lg h-32" controls />
+                <button
+                  type="button"
+                  onClick={() => deleteExistingVideo(v.id)}
+                  className="bg-red-600 text-white rounded-lg px-3 py-1 text-sm hover:bg-red-700 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ))}
+            {newVideo && (
+              <div className="flex items-center gap-3 mb-2">
+                <video src={URL.createObjectURL(newVideo)} className="rounded-lg h-32" controls />
+                <div>
+                  <span className="text-xs text-blue-600 block mb-1">Nuevo</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewVideo(null)}
+                    className="bg-red-600 text-white rounded-lg px-3 py-1 text-sm hover:bg-red-700 transition-colors"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              </div>
+            )}
+            {existingVideos.length === 0 && !newVideo && (
+              <>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                >
+                  + Agregar video
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Recorrido 360 */}
+          <Field label="Recorrido 360">
+            <input name="recorrido_360" value={form.recorrido_360} onChange={handleChange} placeholder="URL recorrido 360" className={inputClass} />
+          </Field>
         </section>
 
         {/* Documentación */}

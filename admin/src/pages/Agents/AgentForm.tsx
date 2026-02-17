@@ -1,19 +1,39 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
+
+interface AgentForm {
+  name: string
+  phone: string
+  email: string
+  google_calendar_connected?: boolean
+}
 
 export default function AgentForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const isEdit = Boolean(id)
-  const [form, setForm] = useState({ name: '', phone: '', email: '' })
+  const [form, setForm] = useState<AgentForm>({ name: '', phone: '', email: '' })
   const [saving, setSaving] = useState(false)
+  const [googleStatus, setGoogleStatus] = useState<string | null>(null)
 
   useEffect(() => {
     if (isEdit) {
       api.get(`/agents/${id}/`).then((res) => setForm(res.data))
     }
   }, [id])
+
+  useEffect(() => {
+    const googleParam = searchParams.get('google')
+    if (googleParam === 'connected') {
+      setGoogleStatus('connected')
+      // Refresh agent data to get updated google_calendar_connected
+      if (id) api.get(`/agents/${id}/`).then((res) => setForm(res.data))
+    } else if (googleParam === 'error') {
+      setGoogleStatus('error')
+    }
+  }, [searchParams])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -22,13 +42,26 @@ export default function AgentForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    const { google_calendar_connected, ...payload } = form
     if (isEdit) {
-      await api.put(`/agents/${id}/`, form)
+      await api.put(`/agents/${id}/`, payload)
     } else {
-      await api.post('/agents/', form)
+      await api.post('/agents/', payload)
     }
     setSaving(false)
     navigate('/agents')
+  }
+
+  const handleConnectGoogle = () => {
+    const apiBase = import.meta.env.VITE_API_URL || '/api'
+    window.location.href = `${apiBase}/google/connect/${id}/`
+  }
+
+  const handleDisconnectGoogle = async () => {
+    if (!confirm('¿Desconectar Google Calendar de este agente?')) return
+    await api.post(`/agents/${id}/disconnect-google/`)
+    setForm({ ...form, google_calendar_connected: false })
+    setGoogleStatus(null)
   }
 
   const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -51,6 +84,55 @@ export default function AgentForm() {
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} />
         </div>
+
+        {/* Google Calendar Section */}
+        {isEdit && (
+          <div className="border border-gray-200 rounded-lg p-4 mt-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Google Calendar</h3>
+
+            {googleStatus === 'connected' && (
+              <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-3 py-2 mb-3">
+                Google Calendar conectado exitosamente
+              </div>
+            )}
+            {googleStatus === 'error' && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3">
+                Error al conectar Google Calendar. Intenta de nuevo.
+              </div>
+            )}
+
+            {form.google_calendar_connected ? (
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Conectado
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDisconnectGoogle}
+                  className="text-red-600 hover:text-red-800 text-sm underline"
+                >
+                  Desconectar
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                  No conectado
+                </span>
+                <button
+                  type="button"
+                  onClick={handleConnectGoogle}
+                  className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Conectar Google Calendar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-4 pt-4">
           <button
             type="submit"

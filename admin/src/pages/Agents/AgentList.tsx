@@ -8,6 +8,7 @@ interface Agent {
   name: string
   phone: string
   email: string
+  google_calendar_connected: boolean
 }
 
 export default function AgentList() {
@@ -36,6 +37,20 @@ export default function AgentList() {
     { key: 'name', label: 'Nombre' },
     { key: 'phone', label: 'Teléfono' },
     { key: 'email', label: 'Email' },
+    {
+      key: 'google_calendar_connected',
+      label: 'Calendario',
+      render: (a: Agent) => (
+        a.google_calendar_connected ? (
+          <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+            Conectado
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">-</span>
+        )
+      ),
+    },
     {
       key: 'actions',
       label: '',
