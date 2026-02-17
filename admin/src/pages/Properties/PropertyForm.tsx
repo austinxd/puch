@@ -107,15 +107,17 @@ export default function PropertyForm() {
   }
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setNewImages((prev) => [...prev, ...Array.from(e.target.files!)])
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      setNewImages((prev) => [...prev, ...files])
     }
     if (imageInputRef.current) imageInputRef.current.value = ''
   }
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setNewVideo(e.target.files[0])
+    const file = e.target.files?.[0] || null
+    if (file) {
+      setNewVideo(file)
     }
     if (videoInputRef.current) videoInputRef.current.value = ''
   }
