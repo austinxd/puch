@@ -1,8 +1,12 @@
+import json
 import re
+import logging
 from django.conf import settings
 from django.db.models import Q
 from openai import OpenAI
 from properties.models import Property
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """Eres el asistente virtual de Brikia, una inmobiliaria en Lima, Perú.
 Tu rol es ayudar a los clientes a encontrar propiedades que se ajusten a sus necesidades.
@@ -16,7 +20,6 @@ No inventes propiedades que no estén en el contexto proporcionado."""
 def search_properties(message):
     """Search for relevant properties based on the user message."""
     keywords = re.findall(r'\w+', message.lower())
-    # Remove common words
     stopwords = {
         'busco', 'quiero', 'necesito', 'un', 'una', 'el', 'la', 'los', 'las',
         'de', 'en', 'con', 'para', 'por', 'que', 'es', 'y', 'o', 'me', 'mi',
@@ -39,7 +42,6 @@ def search_properties(message):
             Q(habitaciones__icontains=kw)
         )
 
-    # Detect price range
     price_match = re.search(r'(\d[\d,\.]*)\s*(mil|k|soles|dolares|usd|\$)', message.lower())
     if price_match:
         price_str = price_match.group(1).replace(',', '').replace('.', '')
@@ -53,14 +55,12 @@ def search_properties(message):
     properties = Property.objects.filter(query & keyword_filter).select_related('agent')[:5]
 
     if not properties.exists() and keywords:
-        # Fallback: broader search
         broad_filter = Q()
         for kw in keywords[:3]:
             broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw)
         properties = Property.objects.filter(query & broad_filter).select_related('agent')[:5]
 
     if not properties.exists():
-        # Return some recent active properties
         properties = Property.objects.filter(activo=True).select_related('agent')[:5]
 
     return properties
@@ -91,16 +91,75 @@ def format_property(prop):
     return '\n'.join(line for line in lines if line)
 
 
+def extract_intent(conversation):
+    """Extract client intent from conversation using AI."""
+    if not settings.OPENAI_API_KEY:
+        return
+
+    from .models import ClientIntent
+
+    user_messages = conversation.messages.filter(role='user')
+    if user_messages.count() < 1:
+        return
+
+    messages_text = '\n'.join(f'- {m.content}' for m in user_messages)
+
+    prompt = f"""Analiza los siguientes mensajes de un cliente de una inmobiliaria en Lima, Perú.
+Extrae su intención de búsqueda en formato JSON con estos campos exactos:
+- "operacion": "Venta" o "Alquiler" o "" si no se menciona
+- "tipo_propiedad": tipo que busca (departamento, casa, local, terreno, etc.) o ""
+- "distritos": distritos mencionados separados por coma, o ""
+- "precio_min": número o null
+- "precio_max": número o null
+- "habitaciones": cantidad mencionada o ""
+- "caracteristicas": otras características mencionadas (cochera, vista, piso, etc.) o ""
+- "resumen": resumen breve de lo que busca el cliente en 1-2 oraciones
+
+Mensajes del cliente:
+{messages_text}
+
+Responde SOLO el JSON, sin markdown ni explicación."""
+
+    try:
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.3,
+        )
+        raw = response.choices[0].message.content.strip()
+        # Clean markdown code block if present
+        if raw.startswith('```'):
+            raw = raw.split('\n', 1)[1].rsplit('```', 1)[0]
+        data = json.loads(raw)
+
+        ClientIntent.objects.update_or_create(
+            conversation=conversation,
+            defaults={
+                'phone': conversation.session_id if conversation.session_id.isdigit() else '',
+                'operacion': data.get('operacion', ''),
+                'tipo_propiedad': data.get('tipo_propiedad', ''),
+                'distritos': data.get('distritos', ''),
+                'precio_min': data.get('precio_min'),
+                'precio_max': data.get('precio_max'),
+                'habitaciones': data.get('habitaciones', ''),
+                'caracteristicas': data.get('caracteristicas', ''),
+                'resumen': data.get('resumen', ''),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error extracting intent: {e}")
+
+
 def get_chat_response(conversation, user_message):
     """Generate a chat response using OpenAI."""
     if not settings.OPENAI_API_KEY:
         return "Lo siento, el servicio de chat no está configurado. Contacta al administrador."
 
-    # Get conversation history (last 10 messages)
     history = conversation.messages.order_by('-created_at')[:10]
     history = list(reversed(history))
 
-    # Search relevant properties
     properties = search_properties(user_message)
     property_context = ""
     if properties:
@@ -111,12 +170,10 @@ def get_chat_response(conversation, user_message):
             + "\n--- FIN DE PROPIEDADES ---"
         )
 
-    # Build messages
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT + property_context}
     ]
-    # Add history (skip the current user message, it's added at the end)
-    for msg in history[:-1]:  # Skip last one (current user message already saved)
+    for msg in history[:-1]:
         messages.append({"role": msg.role, "content": msg.content})
     messages.append({"role": "user", "content": user_message})
 
@@ -128,4 +185,9 @@ def get_chat_response(conversation, user_message):
         temperature=0.7,
     )
 
-    return response.choices[0].message.content
+    reply = response.choices[0].message.content
+
+    # Extract intent after every user message
+    extract_intent(conversation)
+
+    return reply

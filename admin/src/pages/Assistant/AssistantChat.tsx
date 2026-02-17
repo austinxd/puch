@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../../api/client'
 import ChatMessage from '../../components/ChatMessage'
 
@@ -16,6 +16,8 @@ interface Message {
   created_at: string
 }
 
+const POLL_INTERVAL = 5000 // 5 seconds
+
 export default function AssistantChat() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -23,27 +25,45 @@ export default function AssistantChat() {
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const selectedIdRef = useRef<string | null>(null)
 
+  const fetchConversations = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    const res = await api.get('/conversations/')
+    setConversations(res.data.results)
+    if (!silent) setLoading(false)
+  }, [])
+
+  const fetchMessages = useCallback(async (sessionId: string) => {
+    const res = await api.get(`/chat/${sessionId}/`)
+    setMessages(res.data.messages)
+  }, [])
+
+  // Initial load
   useEffect(() => {
     fetchConversations()
-  }, [])
+  }, [fetchConversations])
+
+  // Auto-refresh conversations and selected chat
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchConversations(true)
+      if (selectedIdRef.current) {
+        fetchMessages(selectedIdRef.current)
+      }
+    }, POLL_INTERVAL)
+    return () => clearInterval(interval)
+  }, [fetchConversations, fetchMessages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const fetchConversations = async () => {
-    setLoading(true)
-    const res = await api.get('/conversations/')
-    setConversations(res.data.results)
-    setLoading(false)
-  }
-
   const selectConversation = async (sessionId: string) => {
     setSelectedId(sessionId)
+    selectedIdRef.current = sessionId
     setLoadingMessages(true)
-    const res = await api.get(`/chat/${sessionId}/`)
-    setMessages(res.data.messages)
+    await fetchMessages(sessionId)
     setLoadingMessages(false)
   }
 
@@ -60,7 +80,13 @@ export default function AssistantChat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Conversaciones</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-900">Conversaciones</h2>
+        <span className="text-xs text-gray-400 flex items-center gap-1">
+          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+          Actualización automática
+        </span>
+      </div>
 
       <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Lista de conversaciones */}

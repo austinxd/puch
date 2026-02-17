@@ -4,6 +4,7 @@ const links = [
   { to: '/properties', label: 'Propiedades', icon: '🏠' },
   { to: '/agents', label: 'Agentes', icon: '👤' },
   { to: '/assistant', label: 'Asistente', icon: '💬' },
+  { to: '/analytics', label: 'Análisis', icon: '📊' },
 ]
 
 export default function Sidebar() {

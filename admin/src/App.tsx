@@ -6,6 +6,7 @@ import PropertyDetail from './pages/Properties/PropertyDetail'
 import AgentList from './pages/Agents/AgentList'
 import AgentForm from './pages/Agents/AgentForm'
 import AssistantChat from './pages/Assistant/AssistantChat'
+import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard'
 import PrivacyPolicy from './pages/Legal/PrivacyPolicy'
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
             <Route path="/agents/new" element={<AgentForm />} />
             <Route path="/agents/:id/edit" element={<AgentForm />} />
             <Route path="/assistant" element={<AssistantChat />} />
+            <Route path="/analytics" element={<AnalyticsDashboard />} />
           </Routes>
         </AdminLayout>
       } />
