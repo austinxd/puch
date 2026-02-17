@@ -112,6 +112,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 BASE_URL = os.environ.get('BASE_URL', 'https://api.brikia.tech')
 
 STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
