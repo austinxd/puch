@@ -1,112 +1,119 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../../api/client'
 import ChatMessage from '../../components/ChatMessage'
+
+interface Conversation {
+  session_id: string
+  created_at: string
+  message_count: number
+  last_message_at: string
+  preview: string
+}
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
-}
-
-function generateId() {
-  return crypto.randomUUID()
+  created_at: string
 }
 
 export default function AssistantChat() {
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [sessionId, setSessionId] = useState(generateId)
+  const [loading, setLoading] = useState(true)
+  const [loadingMessages, setLoadingMessages] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetchConversations()
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleNewConversation = () => {
-    setMessages([])
-    setSessionId(generateId())
+  const fetchConversations = async () => {
+    setLoading(true)
+    const res = await api.get('/conversations/')
+    setConversations(res.data.results)
+    setLoading(false)
   }
 
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text || loading) return
+  const selectConversation = async (sessionId: string) => {
+    setSelectedId(sessionId)
+    setLoadingMessages(true)
+    const res = await api.get(`/chat/${sessionId}/`)
+    setMessages(res.data.messages)
+    setLoadingMessages(false)
+  }
 
-    setInput('')
-    setMessages((prev) => [...prev, { role: 'user', content: text }])
-    setLoading(true)
-
-    try {
-      const res = await api.post('/chat/', {
-        message: text,
-        session_id: sessionId,
-      })
-      setMessages((prev) => [...prev, { role: 'assistant', content: res.data.reply }])
-      if (res.data.session_id) setSessionId(res.data.session_id)
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Lo siento, ocurrió un error. Intenta de nuevo.' },
-      ])
-    } finally {
-      setLoading(false)
-    }
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-900">Asistente Brikia</h2>
-        <button
-          onClick={handleNewConversation}
-          className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm"
-        >
-          Nueva conversación
-        </button>
-      </div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">Conversaciones</h2>
 
-      <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow p-6 mb-4">
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            <div className="text-center">
-              <p className="text-lg mb-2">Hola, soy el asistente de Brikia</p>
-              <p className="text-sm">Pregúntame sobre propiedades disponibles en Lima</p>
+      <div className="flex flex-1 gap-4 overflow-hidden">
+        {/* Lista de conversaciones */}
+        <div className="w-80 shrink-0 bg-white rounded-lg shadow overflow-y-auto">
+          {loading ? (
+            <p className="p-4 text-gray-500">Cargando...</p>
+          ) : conversations.length === 0 ? (
+            <p className="p-4 text-gray-500 text-center">No hay conversaciones aún</p>
+          ) : (
+            conversations.map((conv) => (
+              <button
+                key={conv.session_id}
+                onClick={() => selectConversation(conv.session_id)}
+                className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                  selectedId === conv.session_id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
+                }`}
+              >
+                <p className="text-sm text-gray-900 font-medium truncate">
+                  {conv.preview || 'Sin mensaje'}
+                </p>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-xs text-gray-500">
+                    {formatDate(conv.last_message_at)}
+                  </span>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                    {conv.message_count} msgs
+                  </span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Detalle de conversación */}
+        <div className="flex-1 bg-white rounded-lg shadow p-6 overflow-y-auto">
+          {!selectedId ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              <p>Selecciona una conversación para ver el historial</p>
             </div>
-          </div>
-        )}
-        {messages.map((msg, i) => (
-          <ChatMessage key={i} role={msg.role} content={msg.content} />
-        ))}
-        {loading && (
-          <div className="flex justify-start mb-4">
-            <div className="bg-gray-200 rounded-2xl px-4 py-3 rounded-bl-sm">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
-                <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:0.1s]" />
-                <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+          ) : loadingMessages ? (
+            <p className="text-gray-500">Cargando mensajes...</p>
+          ) : (
+            <>
+              <div className="mb-4 pb-3 border-b border-gray-200">
+                <p className="text-xs text-gray-500">Sesión: {selectedId}</p>
               </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Escribe tu mensaje..."
-          disabled={loading}
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-        />
-        <button
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          Enviar
-        </button>
+              {messages.map((msg, i) => (
+                <ChatMessage key={i} role={msg.role} content={msg.content} />
+              ))}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

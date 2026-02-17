@@ -1,7 +1,9 @@
 import uuid
+from django.db.models import Count, Max
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from .models import ChatConversation, ChatMessage
 from .services import get_chat_response
 
@@ -40,6 +42,33 @@ class ChatView(APIView):
             'session_id': session_id,
             'reply': reply,
         })
+
+
+class ConversationListView(APIView):
+    def get(self, request):
+        conversations = (
+            ChatConversation.objects
+            .annotate(
+                message_count=Count('messages'),
+                last_message_at=Max('messages__created_at'),
+            )
+            .filter(message_count__gt=0)
+            .order_by('-last_message_at')
+        )
+
+        # Get first user message as preview for each conversation
+        results = []
+        for conv in conversations:
+            first_msg = conv.messages.filter(role='user').first()
+            results.append({
+                'session_id': str(conv.session_id),
+                'created_at': conv.created_at,
+                'message_count': conv.message_count,
+                'last_message_at': conv.last_message_at,
+                'preview': first_msg.content[:100] if first_msg else '',
+            })
+
+        return Response({'results': results})
 
 
 class ChatHistoryView(APIView):
