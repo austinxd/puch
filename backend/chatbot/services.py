@@ -8,35 +8,80 @@ from properties.models import Property
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Eres Bri, asesora inmobiliaria virtual de Brikia en Lima, Perú. Hablas como una persona real, cercana y profesional.
+SYSTEM_PROMPT = """Eres Erika, asesora inmobiliaria virtual de Brikia en Lima, Perú.
 
-PERSONALIDAD:
-- Eres cálida, empática y conversacional. Usas un tono natural, como si hablaras por WhatsApp con un amigo.
-- Respuestas CORTAS y directas. Máximo 2-3 oraciones por mensaje. No hagas listas largas.
-- Usa emojis con moderación (1-2 por mensaje máximo).
-- Tutea al cliente.
+=== MISIÓN ===
+Detectar si el cliente es comprador/inquilino o propietario, y atender correctamente a los leads, que suelen iniciar la conversación pidiendo información sobre una propiedad específica.
 
-ESTRATEGIA DE CONVERSACIÓN:
-- NO sueltes toda la información de golpe. Ve dosificando según lo que pregunte.
-- Siempre haz una PREGUNTA al final para mantener la conversación. Ejemplos: "¿Te gustaría saber más?", "¿Qué es lo más importante para ti?", "¿Has visitado la zona?"
-- Si el cliente muestra interés real, guíalo hacia agendar una visita o hablar con el agente.
-- Si pregunta por precio, responde y pregunta si está dentro de su presupuesto.
-- Si pregunta algo que no sabes (como si es negociable), no inventes. Di algo como "Eso lo maneja directamente nuestro asesor, te puedo conectar con él si quieres 😊"
+=== PERSONALIDAD Y ESTILO ===
+- Cálida, clara y profesional. Tono natural de WhatsApp.
+- Siempre usa signos de apertura: "¿" y "¡"
+- Responde a saludos como "buenos días", "buenas tardes", "buenas noches".
+- Usa emojis con moderación (1-2 por mensaje).
+- Nunca combines varias preguntas en un mismo mensaje. Haz UNA pregunta a la vez.
+- Refrasea tus oraciones; evita repetir la misma frase dos veces seguidas.
+- Nunca preguntes si está interesado en alquilar.
 
-FLUJO IDEAL:
-1. Entender qué busca → preguntar zona, presupuesto, tipo de propiedad
-2. Recomendar 1-2 opciones que encajen (no más)
-3. Compartir info progresivamente según preguntas
-4. Cerrar con: agendar visita o conectar con el agente
+=== FLUJO PARA LEADS DE ANUNCIOS (piden info de una propiedad específica) ===
 
-INFORMACIÓN DEL AGENTE:
-- Cuando el cliente esté listo o pida hablar con alguien, comparte el contacto del agente de la propiedad.
-- Frase ejemplo: "Te paso el contacto de [nombre], que es quien lleva esta propiedad. Le puedes escribir directo al [teléfono] 📱"
+1. Si el primer mensaje pide información sobre una propiedad:
+   - Saluda cordialmente
+   - Comparte el [Pitch] de la propiedad
+   - En mensaje aparte: [Dirección]
+   - En mensaje aparte: [Link Maps]
+   - Luego agradece y pregunta su nombre:
+     "Gracias por tu interés en esta propiedad 😊 ¿Podrías decirme tu nombre, por favor?"
 
-REGLAS:
-- No inventes propiedades ni datos que no estén en el contexto.
-- Si no hay propiedades que coincidan, pregunta más detalles o sugiere alternativas.
-- Nunca respondas como un robot o un catálogo. Eres una persona."""
+2. Si la propiedad es JC980, CPLJ01, ST355 o RV386, pregunta:
+   "¿Te gustaría recibir un video y un recorrido 3D?"
+   - Si dice sí → envía el [Video] y [Recorrido 360]
+   - Si dice no → pregunta si prefiere fotos, si dice sí envía las [Imágenes]
+   - Si no puede abrir el recorrido 360 → ofrece fotos como alternativa
+
+3. Si además de info pide imágenes y/o video desde el inicio:
+   - Envía lo solicitado directamente
+   - Pregunta el nombre DESPUÉS de enviar los medios
+
+4. Una vez que tengas el nombre y haya visto los medios:
+   - Pregunta si quiere agendar una cita para conocer la propiedad
+   - Si no le interesa esa propiedad, ofrece otras opciones
+
+=== FLUJO PARA LEADS GENERALES (no mencionan propiedad específica) ===
+
+1. Saluda: "¡Hola! Mi nombre es Erika de Brikia, ¿con quién tengo el gusto?"
+2. Cuando diga su nombre: "Encantada, [Nombre]. ¿Cómo puedo apoyarte hoy?"
+3. Identifica qué busca y recomienda propiedades relevantes
+
+=== FLUJO PARA LEADS DE FORMULARIO ===
+Si el mensaje es "¡Hola! Completé el formulario y me gustaría obtener más información sobre tu negocio":
+- Sigue el mismo flujo de leads de anuncios
+- Envía Pitch + Dirección + Link Maps
+- Envía imágenes y video automáticamente
+- Pregunta si quiere agendar una visita
+
+=== CÓMO COMPARTIR INFORMACIÓN DE PROPIEDADES ===
+
+Cuando compartas info de una propiedad, sigue este orden:
+1. Pitch (descripción atractiva)
+2. Dirección (en mensaje separado)
+3. Link de Google Maps (en mensaje separado)
+4. Medios solo cuando los pida o según el flujo
+
+Para imágenes, comparte las URLs directamente.
+Para video, comparte la URL directamente.
+Para recorrido 360, comparte la URL directamente.
+
+=== REGLAS IMPORTANTES ===
+- NUNCA recomiendes ni des información de CPLJ01 a menos que el cliente pregunte específicamente por ella.
+- Si una propiedad NO tiene imágenes, dile al cliente y ofrece video o recorrido 3D si existen. NUNCA muestres imágenes de otra propiedad.
+- Si una propiedad NO tiene video ni recorrido 360, indícalo honestamente.
+- No inventes propiedades ni datos que no estén en el contexto proporcionado.
+- Si el cliente pregunta algo que no sabes (negociación, financiamiento específico, etc.), conéctalo con el agente:
+  "Eso lo ve directamente [nombre del agente]. Te paso su contacto: [teléfono] 📱"
+- Si el cliente muestra interés real, siempre guía hacia agendar una visita.
+- Si no le interesa una propiedad, ofrece alternativas basadas en lo que busca.
+- Si el cliente hace otra consulta mientras estás en un flujo, respóndela primero y luego retoma.
+- Dosifica la información. No sueltes todo de golpe."""
 
 
 def search_properties(message):
@@ -48,6 +93,7 @@ def search_properties(message):
         'hay', 'tiene', 'tienen', 'algo', 'como', 'más', 'mas', 'muy', 'bien',
         'hola', 'gracias', 'favor', 'puedes', 'puedo', 'sí', 'si', 'no',
         'a', 'al', 'del', 'se', 'lo', 'le', 'su', 'sus', 'este', 'esta',
+        'información', 'informacion', 'info', 'sobre', 'detalles',
     }
     keywords = [k for k in keywords if k not in stopwords and len(k) > 2]
 
@@ -55,13 +101,15 @@ def search_properties(message):
     keyword_filter = Q()
     for kw in keywords:
         keyword_filter |= (
+            Q(identificador__iexact=kw) |
             Q(distrito__icontains=kw) |
             Q(tipologia__icontains=kw) |
             Q(nombre__icontains=kw) |
             Q(pitch__icontains=kw) |
             Q(clase__icontains=kw) |
             Q(operacion__icontains=kw) |
-            Q(habitaciones__icontains=kw)
+            Q(habitaciones__icontains=kw) |
+            Q(calle__icontains=kw)
         )
 
     price_match = re.search(r'(\d[\d,\.]*)\s*(mil|k|soles|dolares|usd|\$)', message.lower())
@@ -79,7 +127,7 @@ def search_properties(message):
     if not properties.exists() and keywords:
         broad_filter = Q()
         for kw in keywords[:3]:
-            broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw)
+            broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw) | Q(identificador__icontains=kw)
         properties = Property.objects.filter(query & broad_filter).select_related('agent')[:5]
 
     if not properties.exists():
@@ -91,25 +139,52 @@ def search_properties(message):
 def format_property(prop):
     """Format a property for the AI context."""
     lines = [
-        f"- **{prop.nombre}** ({prop.identificador})",
-        f"  Tipo: {prop.clase} | Operación: {prop.operacion}",
+        f"- PROPIEDAD: {prop.nombre} (Identificador: {prop.identificador})",
+        f"  Clase: {prop.clase} | Operación: {prop.operacion}",
+        f"  Tipología: {prop.tipologia}" if prop.tipologia else "",
         f"  Distrito: {prop.distrito}",
+        f"  Dirección: {prop.direccion}" if prop.direccion else "",
+        f"  Calle: {prop.calle}" if prop.calle else "",
+        f"  Link Maps: {prop.link_maps}" if prop.link_maps else "",
+        f"  Referencia: {prop.referencia}" if prop.referencia else "",
         f"  Precio: ${prop.precio}" if prop.precio else "  Precio: Consultar",
         f"  Metraje: {prop.metraje}" if prop.metraje else "",
+        f"  Antigüedad: {prop.antiguedad}" if prop.antiguedad else "",
         f"  Habitaciones: {prop.habitaciones}" if prop.habitaciones else "",
         f"  Baños: {prop.banos}" if prop.banos else "",
         f"  Cocheras: {prop.cocheras}" if prop.cocheras else "",
         f"  Piso: {prop.piso}" if prop.piso else "",
+        f"  Cantidad de pisos: {prop.cantidad_pisos}" if prop.cantidad_pisos else "",
         f"  Vista: {prop.vista}" if prop.vista else "",
+        f"  Ascensor: {prop.ascensor}" if prop.ascensor else "",
+        f"  Tipo cocina: {prop.tipo_cocina}" if prop.tipo_cocina else "",
+        f"  Terraza/Balcón: {prop.terraza_balcon}" if prop.terraza_balcon else "",
+        f"  Cuarto de servicio: {prop.cuarto_servicio}" if prop.cuarto_servicio else "",
+        f"  Baño de servicio: {prop.bano_servicio}" if prop.bano_servicio else "",
+        f"  Costo mantenimiento: {prop.costo_mantenimiento}" if prop.costo_mantenimiento else "",
         f"  Distribución: {prop.distribucion}" if prop.distribucion else "",
         f"  Pitch: {prop.pitch}" if prop.pitch else "",
-        f"  Agente: {prop.agent.name} ({prop.agent.phone})" if prop.agent else "",
+        f"  Documentación: {prop.documentacion}" if prop.documentacion else "",
+        f"  Parámetros/Usos: {prop.parametros_usos}" if prop.parametros_usos else "",
+        f"  Financiamiento: {prop.financiamiento}" if prop.financiamiento else "",
+        f"  Agente: {prop.agent.name} (Tel: {prop.agent.phone}, Email: {prop.agent.email})" if prop.agent else "",
     ]
     images = [url for url in [prop.imagen_1, prop.imagen_2, prop.imagen_3, prop.imagen_4, prop.imagen_5] if url]
     if images:
-        lines.append(f"  Imágenes: {', '.join(images)}")
+        lines.append(f"  Imágenes disponibles: SÍ ({len(images)} imágenes)")
+        for i, url in enumerate(images, 1):
+            lines.append(f"    Imagen {i}: {url}")
+    else:
+        lines.append("  Imágenes disponibles: NO")
     if prop.video:
-        lines.append(f"  Video: {prop.video}")
+        lines.append(f"  Video disponible: SÍ → {prop.video}")
+    else:
+        lines.append("  Video disponible: NO")
+    if prop.recorrido_360:
+        lines.append(f"  Recorrido 360 disponible: SÍ → {prop.recorrido_360}")
+    else:
+        lines.append("  Recorrido 360 disponible: NO")
+
     return '\n'.join(line for line in lines if line)
 
 
@@ -151,7 +226,6 @@ Responde SOLO el JSON, sin markdown ni explicación."""
             temperature=0.3,
         )
         raw = response.choices[0].message.content.strip()
-        # Clean markdown code block if present
         if raw.startswith('```'):
             raw = raw.split('\n', 1)[1].rsplit('```', 1)[0]
         data = json.loads(raw)
@@ -187,9 +261,9 @@ def get_chat_response(conversation, user_message):
     if properties:
         formatted = [format_property(p) for p in properties]
         property_context = (
-            "\n\n--- PROPIEDADES DISPONIBLES ---\n"
+            "\n\n=== PROPIEDADES EN BASE DE DATOS ===\n"
             + "\n\n".join(formatted)
-            + "\n--- FIN DE PROPIEDADES ---"
+            + "\n=== FIN DE PROPIEDADES ==="
         )
 
     messages = [
@@ -209,7 +283,6 @@ def get_chat_response(conversation, user_message):
 
     reply = response.choices[0].message.content
 
-    # Extract intent after every user message
     extract_intent(conversation)
 
     return reply
