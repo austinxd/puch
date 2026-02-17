@@ -131,4 +131,9 @@ REST_FRAMEWORK = {
 # OpenAI
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
+# WhatsApp Business
+WHATSAPP_VERIFY_TOKEN = os.environ.get('WHATSAPP_VERIFY_TOKEN', '')
+WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
+WHATSAPP_PHONE_ID = os.environ.get('WHATSAPP_PHONE_ID', '')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
