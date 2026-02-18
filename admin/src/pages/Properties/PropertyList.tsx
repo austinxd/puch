@@ -11,6 +11,7 @@ interface Property {
   operacion: string
   distrito: string
   precio: string | null
+  moneda: string
   agent_name: string
   activo: boolean
   first_image: string | null
@@ -53,7 +54,7 @@ export default function PropertyList() {
     {
       key: 'precio',
       label: 'Precio',
-      render: (p: Property) => p.precio ? `$${Number(p.precio).toLocaleString()}` : '-',
+      render: (p: Property) => p.precio ? `${p.moneda === 'PEN' ? 'S/' : '$'}${Number(p.precio).toLocaleString()}` : '-',
     },
     { key: 'agent_name', label: 'Agente' },
     {

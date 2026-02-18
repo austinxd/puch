@@ -24,6 +24,7 @@ interface Property {
   direccion: string
   referencia: string
   precio: string | null
+  moneda: string
   metraje: string
   habitaciones: string
   banos: string
@@ -120,7 +121,7 @@ export default function PropertyDetail() {
             <InfoRow label="Clase" value={property.clase} />
             <InfoRow label="Operación" value={property.operacion} />
             <InfoRow label="Tipología" value={property.tipologia} />
-            <InfoRow label="Precio" value={property.precio ? `$${Number(property.precio).toLocaleString()}` : null} />
+            <InfoRow label="Precio" value={property.precio ? `${property.moneda === 'PEN' ? 'S/' : '$'}${Number(property.precio).toLocaleString()}` : null} />
             <InfoRow label="Agente" value={property.agent_name} />
             <InfoRow label="Antigüedad" value={property.antiguedad} />
             <InfoRow label="Costo Mant." value={property.costo_mantenimiento} />
