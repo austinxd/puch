@@ -168,6 +168,71 @@ def check_availability(agent_id, date_str, time_str=None):
     }
 
 
+def get_calendar_events(agent_id, date_from, date_to):
+    """
+    Fetch Google Calendar events for an agent in a date range.
+
+    Args:
+        agent_id: ID of the agent
+        date_from: Start date string YYYY-MM-DD
+        date_to: End date string YYYY-MM-DD
+
+    Returns:
+        list of event dicts or error dict
+    """
+    try:
+        agent = Agent.objects.get(pk=agent_id)
+    except Agent.DoesNotExist:
+        return {'error': 'Agente no encontrado'}
+
+    if not agent.google_calendar_connected:
+        return {'error': 'El agente no tiene Google Calendar conectado'}
+
+    service = _get_calendar_service(agent)
+    if not service:
+        return {'error': 'No se pudo conectar con Google Calendar'}
+
+    tz = ZoneInfo(TIMEZONE)
+    try:
+        start_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+        end_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+    except ValueError:
+        return {'error': 'Formato de fecha inválido'}
+
+    time_min = datetime.combine(start_date, dt_time(0, 0), tzinfo=tz)
+    time_max = datetime.combine(end_date, dt_time(23, 59, 59), tzinfo=tz)
+
+    try:
+        result = service.events().list(
+            calendarId='primary',
+            timeMin=time_min.isoformat(),
+            timeMax=time_max.isoformat(),
+            singleEvents=True,
+            orderBy='startTime',
+            maxResults=100,
+        ).execute()
+    except Exception as e:
+        logger.error(f"Error fetching calendar events for agent {agent_id}: {e}")
+        return {'error': 'Error al consultar Google Calendar'}
+
+    events = []
+    for event in result.get('items', []):
+        start = event.get('start', {})
+        end = event.get('end', {})
+        events.append({
+            'id': event.get('id', ''),
+            'title': event.get('summary', 'Sin título'),
+            'start': start.get('dateTime', start.get('date', '')),
+            'end': end.get('dateTime', end.get('date', '')),
+            'location': event.get('location', ''),
+            'description': event.get('description', ''),
+            'agent_id': agent.id,
+            'agent_name': agent.name,
+        })
+
+    return events
+
+
 def create_appointment(agent_id, property_id, client_name, client_phone, date_str, time_str, session_id=''):
     """
     Create an appointment on Google Calendar and in local DB.

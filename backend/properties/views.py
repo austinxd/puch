@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from rest_framework import viewsets, status
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
@@ -8,6 +10,7 @@ from .serializers import (
     AgentSerializer, AppointmentSerializer, PropertySerializer,
     PropertyListSerializer, PropertyImageSerializer, PropertyVideoSerializer,
 )
+from .calendar_service import get_calendar_events
 
 
 class AgentViewSet(viewsets.ModelViewSet):
@@ -34,6 +37,24 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'agent']
     search_fields = ['client_name', 'client_phone', 'property__identificador']
     ordering_fields = ['datetime_start', 'created_at']
+
+
+class CalendarEventsView(APIView):
+    """Fetch Google Calendar events for all connected agents."""
+
+    def get(self, request):
+        date_from = request.query_params.get('from', date.today().strftime('%Y-%m-%d'))
+        date_to = request.query_params.get('to', (date.today() + timedelta(days=30)).strftime('%Y-%m-%d'))
+
+        agents = Agent.objects.filter(google_calendar_connected=True)
+        all_events = []
+        for agent in agents:
+            result = get_calendar_events(agent.id, date_from, date_to)
+            if isinstance(result, list):
+                all_events.extend(result)
+
+        all_events.sort(key=lambda e: e.get('start', ''))
+        return Response(all_events)
 
 
 class PropertyImageView(APIView):

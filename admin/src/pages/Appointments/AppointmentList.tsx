@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import api from '../../api/client'
-import DataTable from '../../components/DataTable'
+
+interface CalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  location: string
+  description: string
+  agent_id: number
+  agent_name: string
+}
 
 interface Appointment {
   id: number
@@ -10,72 +20,154 @@ interface Appointment {
   client_name: string
   client_phone: string
   datetime_start: string
+  datetime_end: string
   status: string
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
-  scheduled: { label: 'Programada', className: 'bg-blue-50 text-blue-700' },
-  cancelled: { label: 'Cancelada', className: 'bg-red-50 text-red-700' },
-  completed: { label: 'Completada', className: 'bg-green-50 text-green-700' },
+  scheduled: { label: 'Programada', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+  cancelled: { label: 'Cancelada', className: 'bg-red-50 text-red-700 border-red-200' },
+  completed: { label: 'Completada', className: 'bg-green-50 text-green-700 border-green-200' },
+}
+
+function formatTime(dateStr: string) {
+  const d = new Date(dateStr)
+  return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+function groupByDate(events: CalendarEvent[]): Record<string, CalendarEvent[]> {
+  const groups: Record<string, CalendarEvent[]> = {}
+  for (const event of events) {
+    const dateKey = event.start.split('T')[0]
+    if (!groups[dateKey]) groups[dateKey] = []
+    groups[dateKey].push(event)
+  }
+  return groups
 }
 
 export default function AppointmentList() {
+  const [events, setEvents] = useState<CalendarEvent[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [view, setView] = useState<'calendar' | 'appointments'>('calendar')
 
   useEffect(() => {
-    api.get('/appointments/').then((res) => {
-      setAppointments(res.data.results)
+    const today = new Date()
+    const from = today.toISOString().split('T')[0]
+    const to = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0]
+
+    Promise.all([
+      api.get('/calendar/events/', { params: { from, to } }),
+      api.get('/appointments/'),
+    ]).then(([eventsRes, apptRes]) => {
+      setEvents(eventsRes.data)
+      setAppointments(apptRes.data.results)
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [])
 
-  const columns = [
-    { key: 'client_name', label: 'Cliente' },
-    { key: 'client_phone', label: 'Teléfono' },
-    {
-      key: 'property_identifier',
-      label: 'Propiedad',
-      render: (a: Appointment) => (
-        <span title={a.property_name}>{a.property_identifier}</span>
-      ),
-    },
-    { key: 'agent_name', label: 'Agente' },
-    {
-      key: 'datetime_start',
-      label: 'Fecha y Hora',
-      render: (a: Appointment) => {
-        const d = new Date(a.datetime_start)
-        return d.toLocaleString('es-PE', {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        })
-      },
-    },
-    {
-      key: 'status',
-      label: 'Estado',
-      render: (a: Appointment) => {
-        const s = statusLabels[a.status] || { label: a.status, className: 'bg-gray-50 text-gray-700' }
-        return (
-          <span className={`text-xs px-2 py-0.5 rounded-full ${s.className}`}>
-            {s.label}
-          </span>
-        )
-      },
-    },
-  ]
+  const grouped = groupByDate(events)
+  const sortedDates = Object.keys(grouped).sort()
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Citas</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Citas y Agenda</h2>
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setView('calendar')}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              view === 'calendar' ? 'bg-white shadow text-gray-900' : 'text-gray-500'
+            }`}
+          >
+            Agenda Google
+          </button>
+          <button
+            onClick={() => setView('appointments')}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              view === 'appointments' ? 'bg-white shadow text-gray-900' : 'text-gray-500'
+            }`}
+          >
+            Citas Chatbot
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <p className="text-gray-500">Cargando...</p>
+      ) : view === 'calendar' ? (
+        <div className="space-y-6">
+          {sortedDates.length === 0 ? (
+            <p className="text-gray-500 text-center py-12">No hay eventos en los próximos 30 días</p>
+          ) : (
+            sortedDates.map((dateKey) => (
+              <div key={dateKey}>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">
+                  {formatDate(grouped[dateKey][0].start)}
+                </h3>
+                <div className="space-y-2">
+                  {grouped[dateKey].map((event) => (
+                    <div
+                      key={event.id}
+                      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex gap-4"
+                    >
+                      <div className="text-right shrink-0 w-20">
+                        <p className="text-sm font-semibold text-gray-900">{formatTime(event.start)}</p>
+                        <p className="text-xs text-gray-400">{formatTime(event.end)}</p>
+                      </div>
+                      <div className="border-l-4 border-blue-500 pl-4 flex-1">
+                        <p className="font-medium text-gray-900">{event.title}</p>
+                        {event.location && (
+                          <p className="text-sm text-gray-500 mt-1">{event.location}</p>
+                        )}
+                        {event.description && (
+                          <p className="text-xs text-gray-400 mt-1 whitespace-pre-wrap line-clamp-2">{event.description}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-2">Agente: {event.agent_name}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       ) : (
-        <DataTable columns={columns} data={appointments} />
+        <div className="space-y-2">
+          {appointments.length === 0 ? (
+            <p className="text-gray-500 text-center py-12">No hay citas del chatbot</p>
+          ) : (
+            appointments.map((a) => {
+              const s = statusLabels[a.status] || { label: a.status, className: 'bg-gray-50 text-gray-700 border-gray-200' }
+              return (
+                <div key={a.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex gap-4">
+                  <div className="text-right shrink-0 w-20">
+                    <p className="text-sm font-semibold text-gray-900">{formatTime(a.datetime_start)}</p>
+                    <p className="text-xs text-gray-400">{formatTime(a.datetime_end)}</p>
+                  </div>
+                  <div className="border-l-4 border-green-500 pl-4 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{a.client_name}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${s.className}`}>{s.label}</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">{a.property_identifier} - {a.property_name}</p>
+                    {a.client_phone && (
+                      <p className="text-xs text-gray-400 mt-1">Tel: {a.client_phone}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      {formatDate(a.datetime_start)} | Agente: {a.agent_name}
+                    </p>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
       )}
     </div>
   )
