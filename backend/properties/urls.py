@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AgentViewSet, PropertyViewSet, AppointmentViewSet,
     CalendarEventsView,
-    PropertyImageView, PropertyImageDetailView,
+    PropertyImageView, PropertyImageDetailView, ImageTagsView,
     PropertyVideoView, PropertyVideoDetailView,
 )
 from .google_auth import GoogleConnectView, GoogleCallbackView, DisconnectGoogleView
@@ -16,6 +16,7 @@ router.register(r'appointments', AppointmentViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     # Property media
+    path('properties/image-tags/', ImageTagsView.as_view(), name='image-tags'),
     path('properties/<int:property_id>/images/', PropertyImageView.as_view(), name='property-images'),
     path('properties/<int:property_id>/images/<int:image_id>/', PropertyImageDetailView.as_view(), name='property-image-detail'),
     path('properties/<int:property_id>/videos/', PropertyVideoView.as_view(), name='property-videos'),

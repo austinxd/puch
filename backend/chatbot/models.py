@@ -54,3 +54,14 @@ class ClientIntent(models.Model):
 
     def __str__(self):
         return f'{self.phone or self.conversation.session_id} - {self.tipo_propiedad} {self.operacion}'
+
+
+class SystemPrompt(models.Model):
+    content = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'System Prompt'
+
+    def __str__(self):
+        return f'System Prompt (updated {self.updated_at})'

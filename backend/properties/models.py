@@ -73,9 +73,25 @@ class Property(models.Model):
 
 
 class PropertyImage(models.Model):
+    COMMON_TAGS = [
+        ('fachada', 'Fachada'),
+        ('sala', 'Sala'),
+        ('comedor', 'Comedor'),
+        ('cocina', 'Cocina'),
+        ('habitacion', 'Habitación'),
+        ('bano', 'Baño'),
+        ('terraza', 'Terraza'),
+        ('vista', 'Vista'),
+        ('cochera', 'Cochera'),
+        ('lobby', 'Lobby'),
+        ('piscina', 'Piscina'),
+        ('areas_comunes', 'Áreas comunes'),
+    ]
+
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='properties/images/')
     order = models.PositiveIntegerField(default=0)
+    tag = models.CharField(max_length=100, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

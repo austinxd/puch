@@ -6,6 +6,7 @@ const links = [
   { to: '/appointments', label: 'Citas', icon: '📅' },
   { to: '/assistant', label: 'Asistente', icon: '💬' },
   { to: '/analytics', label: 'Análisis', icon: '📊' },
+  { to: '/prompt', label: 'Prompt', icon: '🤖' },
 ]
 
 export default function Sidebar() {

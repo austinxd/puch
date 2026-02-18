@@ -8,6 +8,7 @@ import AgentForm from './pages/Agents/AgentForm'
 import AppointmentList from './pages/Appointments/AppointmentList'
 import AssistantChat from './pages/Assistant/AssistantChat'
 import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard'
+import PromptEditor from './pages/Prompt/PromptEditor'
 import PrivacyPolicy from './pages/Legal/PrivacyPolicy'
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
             <Route path="/appointments" element={<AppointmentList />} />
             <Route path="/assistant" element={<AssistantChat />} />
             <Route path="/analytics" element={<AnalyticsDashboard />} />
+            <Route path="/prompt" element={<PromptEditor />} />
           </Routes>
         </AdminLayout>
       } />

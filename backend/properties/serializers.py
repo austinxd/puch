@@ -13,7 +13,7 @@ class AgentSerializer(serializers.ModelSerializer):
 class PropertyImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = PropertyImage
-        fields = ['id', 'image', 'order']
+        fields = ['id', 'image', 'order', 'tag']
 
 
 class PropertyVideoSerializer(serializers.ModelSerializer):

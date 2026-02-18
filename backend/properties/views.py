@@ -66,7 +66,8 @@ class PropertyImageView(APIView):
         if not image_file:
             return Response({'error': 'No image file provided'}, status=status.HTTP_400_BAD_REQUEST)
         order = request.data.get('order', 0)
-        img = PropertyImage.objects.create(property=prop, image=image_file, order=order)
+        tag = request.data.get('tag', '')
+        img = PropertyImage.objects.create(property=prop, image=image_file, order=order, tag=tag)
         serializer = PropertyImageSerializer(img, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -74,10 +75,17 @@ class PropertyImageView(APIView):
 class PropertyImageDetailView(APIView):
     def patch(self, request, property_id, image_id):
         img = get_object_or_404(PropertyImage, pk=image_id, property_id=property_id)
+        update_fields = []
         order = request.data.get('order')
         if order is not None:
             img.order = order
-            img.save(update_fields=['order'])
+            update_fields.append('order')
+        tag = request.data.get('tag')
+        if tag is not None:
+            img.tag = tag
+            update_fields.append('tag')
+        if update_fields:
+            img.save(update_fields=update_fields)
         serializer = PropertyImageSerializer(img, context={'request': request})
         return Response(serializer.data)
 
@@ -86,6 +94,11 @@ class PropertyImageDetailView(APIView):
         img.image.delete(save=False)
         img.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ImageTagsView(APIView):
+    def get(self, request):
+        return Response(PropertyImage.COMMON_TAGS)
 
 
 class PropertyVideoView(APIView):

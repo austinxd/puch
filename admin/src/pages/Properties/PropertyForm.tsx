@@ -11,6 +11,12 @@ interface PropertyImageData {
   id: number
   image: string
   order: number
+  tag: string
+}
+
+interface NewImage {
+  file: File
+  tag: string
 }
 
 interface PropertyVideoData {
@@ -65,6 +71,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+type TagOption = [string, string]
+
 const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
 export default function PropertyForm() {
@@ -76,13 +84,15 @@ export default function PropertyForm() {
   const [saving, setSaving] = useState(false)
   const [existingImages, setExistingImages] = useState<PropertyImageData[]>([])
   const [existingVideos, setExistingVideos] = useState<PropertyVideoData[]>([])
-  const [newImages, setNewImages] = useState<File[]>([])
+  const [newImages, setNewImages] = useState<NewImage[]>([])
   const [newVideo, setNewVideo] = useState<File | null>(null)
+  const [imageTags, setImageTags] = useState<TagOption[]>([])
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.get('/agents/').then((res) => setAgents(res.data.results))
+    api.get('/properties/image-tags/').then((res) => setImageTags(res.data))
     if (isEdit) {
       api.get(`/properties/${id}/`).then((res) => {
         const d = res.data
@@ -109,7 +119,7 @@ export default function PropertyForm() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length > 0) {
-      setNewImages((prev) => [...prev, ...files])
+      setNewImages((prev) => [...prev, ...files.map((file) => ({ file, tag: '' }))])
     }
     if (imageInputRef.current) imageInputRef.current.value = ''
   }
@@ -126,6 +136,15 @@ export default function PropertyForm() {
     setNewImages((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const updateExistingImageTag = async (imageId: number, tag: string) => {
+    await api.patch(`/properties/${id}/images/${imageId}/`, { tag })
+    setExistingImages((prev) => prev.map((img) => img.id === imageId ? { ...img, tag } : img))
+  }
+
+  const updateNewImageTag = (index: number, tag: string) => {
+    setNewImages((prev) => prev.map((img, i) => i === index ? { ...img, tag } : img))
+  }
+
   const deleteExistingImage = async (imageId: number) => {
     await api.delete(`/properties/${id}/images/${imageId}/`)
     setExistingImages((prev) => prev.filter((img) => img.id !== imageId))
@@ -139,8 +158,9 @@ export default function PropertyForm() {
   const uploadMedia = async (propertyId: number | string) => {
     for (let i = 0; i < newImages.length; i++) {
       const formData = new FormData()
-      formData.append('image', newImages[i])
+      formData.append('image', newImages[i].file)
       formData.append('order', String(existingImages.length + i))
+      formData.append('tag', newImages[i].tag)
       await api.post(`/properties/${propertyId}/images/`, formData)
     }
     if (newVideo) {
@@ -326,11 +346,21 @@ export default function PropertyForm() {
                   >
                     X
                   </button>
+                  <select
+                    value={img.tag}
+                    onChange={(e) => updateExistingImageTag(img.id, e.target.value)}
+                    className="w-full mt-1 border border-gray-300 rounded px-2 py-1 text-xs"
+                  >
+                    <option value="">Sin tag</option>
+                    {imageTags.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
                 </div>
               ))}
-              {newImages.map((file, i) => (
+              {newImages.map((img, i) => (
                 <div key={`new-${i}`} className="relative group">
-                  <img src={URL.createObjectURL(file)} alt="" className="rounded-lg object-cover w-full h-32" />
+                  <img src={URL.createObjectURL(img.file)} alt="" className="rounded-lg object-cover w-full h-32" />
                   <button
                     type="button"
                     onClick={() => removeNewImage(i)}
@@ -339,6 +369,16 @@ export default function PropertyForm() {
                     X
                   </button>
                   <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">Nueva</span>
+                  <select
+                    value={img.tag}
+                    onChange={(e) => updateNewImageTag(i, e.target.value)}
+                    className="w-full mt-1 border border-gray-300 rounded px-2 py-1 text-xs"
+                  >
+                    <option value="">Sin tag</option>
+                    {imageTags.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>
