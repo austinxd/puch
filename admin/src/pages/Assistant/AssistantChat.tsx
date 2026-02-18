@@ -67,6 +67,8 @@ export default function AssistantChat() {
     setLoadingMessages(false)
   }
 
+  const isPhone = (id: string) => /^\d{7,15}$/.test(id)
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr)
     return d.toLocaleDateString('es-PE', {
@@ -104,6 +106,11 @@ export default function AssistantChat() {
                   selectedId === conv.session_id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                 }`}
               >
+                {isPhone(conv.session_id) && (
+                  <p className="text-xs text-green-600 font-medium mb-1">
+                    +{conv.session_id}
+                  </p>
+                )}
                 <p className="text-sm text-gray-900 font-medium truncate">
                   {conv.preview || 'Sin mensaje'}
                 </p>
@@ -130,8 +137,28 @@ export default function AssistantChat() {
             <p className="text-gray-500">Cargando mensajes...</p>
           ) : (
             <>
-              <div className="mb-4 pb-3 border-b border-gray-200">
-                <p className="text-xs text-gray-500">Sesión: {selectedId}</p>
+              <div className="mb-4 pb-3 border-b border-gray-200 flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  {isPhone(selectedId) ? `+${selectedId}` : `Sesión: ${selectedId.slice(0, 8)}`}
+                </p>
+                {isPhone(selectedId) && (
+                  <div className="flex gap-2">
+                    <a
+                      href={`https://wa.me/${selectedId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors"
+                    >
+                      WhatsApp
+                    </a>
+                    <a
+                      href={`tel:+${selectedId}`}
+                      className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
+                    >
+                      Llamar
+                    </a>
+                  </div>
+                )}
               </div>
               {messages.map((msg, i) => (
                 <ChatMessage key={i} role={msg.role} content={msg.content} />
