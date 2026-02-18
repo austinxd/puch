@@ -404,8 +404,16 @@ def get_chat_response(conversation, user_message):
     # Inject current date into the system prompt
     system_prompt = get_system_prompt().replace('{current_date}', date.today().strftime('%Y-%m-%d (%A)'))
 
+    media_instructions = (
+        "\n\n=== INSTRUCCIONES DE MEDIA ==="
+        "\nCuando envíes fotos o videos usando el tool send_property_media, confía en el resultado del tool."
+        " El detalle te indica exactamente qué imágenes se enviaron y de qué área son (fachada, sala, cocina, etc.)."
+        " NUNCA te disculpes ni digas que cometiste un error si el envío fue exitoso."
+        " Si el cliente pregunta de qué es una foto, responde con seguridad usando el tag de la imagen."
+    )
+
     messages = [
-        {"role": "system", "content": system_prompt + property_context}
+        {"role": "system", "content": system_prompt + property_context + media_instructions}
     ]
     for msg in history[:-1]:
         messages.append({"role": msg.role, "content": msg.content})
