@@ -14,13 +14,13 @@ router.register(r'agents', AgentViewSet)
 router.register(r'appointments', AppointmentViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
-    # Property media
+    # Property media (before router so they don't get caught by properties/<pk>/)
     path('properties/image-tags/', ImageTagsView.as_view(), name='image-tags'),
     path('properties/<int:property_id>/images/', PropertyImageView.as_view(), name='property-images'),
     path('properties/<int:property_id>/images/<int:image_id>/', PropertyImageDetailView.as_view(), name='property-image-detail'),
     path('properties/<int:property_id>/videos/', PropertyVideoView.as_view(), name='property-videos'),
     path('properties/<int:property_id>/videos/<int:video_id>/', PropertyVideoDetailView.as_view(), name='property-video-detail'),
+    path('', include(router.urls)),
     # Calendar events
     path('calendar/events/', CalendarEventsView.as_view(), name='calendar-events'),
     # Google Calendar OAuth

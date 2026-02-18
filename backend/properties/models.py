@@ -24,15 +24,26 @@ class Property(models.Model):
         COMERCIAL = 'Comercial', 'Comercial'
         RESIDENCIAL = 'Residencial', 'Residencial'
 
+    class Tipologia(models.TextChoices):
+        CASA = 'Casa', 'Casa'
+        CASA_DE_PLAYA = 'Casa de playa', 'Casa de playa'
+        CASA_DE_CAMPO = 'Casa de campo', 'Casa de campo'
+        DEPARTAMENTO = 'Departamento', 'Departamento'
+        TERRENO = 'Terreno', 'Terreno'
+
     class Operacion(models.TextChoices):
         VENTA = 'Venta', 'Venta'
         ALQUILER = 'Alquiler', 'Alquiler'
+
+    class Moneda(models.TextChoices):
+        USD = 'USD', 'Dólares'
+        PEN = 'PEN', 'Soles'
 
     identificador = models.CharField(max_length=50, unique=True)
     clase = models.CharField(max_length=20, choices=Clase.choices, default=Clase.RESIDENCIAL)
     agent = models.ForeignKey(Agent, on_delete=models.SET_NULL, null=True, blank=True, related_name='properties')
     nombre = models.CharField(max_length=300)
-    tipologia = models.CharField(max_length=200, blank=True, default='')
+    tipologia = models.CharField(max_length=200, choices=Tipologia.choices, blank=True, default='')
     operacion = models.CharField(max_length=20, choices=Operacion.choices, default=Operacion.VENTA)
     link_maps = models.URLField(max_length=500, blank=True, default='')
     distrito = models.CharField(max_length=200, blank=True, default='')
@@ -42,6 +53,7 @@ class Property(models.Model):
     referencia = models.TextField(blank=True, default='')
     antiguedad = models.CharField(max_length=100, blank=True, default='')
     precio = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    moneda = models.CharField(max_length=3, choices=Moneda.choices, default='USD')
     costo_mantenimiento = models.CharField(max_length=200, blank=True, default='')
     metraje = models.CharField(max_length=500, blank=True, default='')
     vista = models.CharField(max_length=200, blank=True, default='')

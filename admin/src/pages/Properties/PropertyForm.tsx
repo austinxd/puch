@@ -39,6 +39,7 @@ const INITIAL = {
   referencia: '',
   antiguedad: '',
   precio: '',
+  moneda: 'USD',
   costo_mantenimiento: '',
   metraje: '',
   vista: '',
@@ -223,7 +224,14 @@ export default function PropertyForm() {
               </select>
             </Field>
             <Field label="Tipología">
-              <input name="tipologia" value={form.tipologia} onChange={handleChange} className={inputClass} />
+              <select name="tipologia" value={form.tipologia} onChange={handleChange} className={inputClass}>
+                <option value="">—</option>
+                <option value="Casa">Casa</option>
+                <option value="Casa de playa">Casa de playa</option>
+                <option value="Casa de campo">Casa de campo</option>
+                <option value="Departamento">Departamento</option>
+                <option value="Terreno">Terreno</option>
+              </select>
             </Field>
             <Field label="Agente">
               <select name="agent" value={form.agent} onChange={handleChange} className={inputClass}>
@@ -234,7 +242,13 @@ export default function PropertyForm() {
               </select>
             </Field>
             <Field label="Precio">
-              <input name="precio" type="number" step="0.01" value={form.precio} onChange={handleChange} className={inputClass} />
+              <div className="flex gap-2">
+                <select name="moneda" value={form.moneda} onChange={handleChange} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-24">
+                  <option value="USD">USD</option>
+                  <option value="PEN">PEN</option>
+                </select>
+                <input name="precio" type="number" step="0.01" value={form.precio} onChange={handleChange} className={inputClass} />
+              </div>
             </Field>
             <Field label="Antigüedad">
               <input name="antiguedad" value={form.antiguedad} onChange={handleChange} className={inputClass} />

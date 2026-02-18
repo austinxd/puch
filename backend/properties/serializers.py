@@ -30,7 +30,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
         model = Property
         fields = [
             'id', 'identificador', 'nombre', 'clase', 'operacion',
-            'distrito', 'precio', 'metraje', 'tipologia', 'activo',
+            'distrito', 'precio', 'moneda', 'metraje', 'tipologia', 'activo',
             'agent', 'agent_name', 'first_image',
         ]
 
