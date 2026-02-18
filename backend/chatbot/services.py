@@ -293,21 +293,28 @@ def execute_tool(tool_name, arguments, session_id=''):
             return json.dumps({'error': f'Propiedad {prop_id} no encontrada'}), []
 
         media = []
+        image_details = []
         if media_type in ('images', 'all'):
             images = prop.images.all()
             if area:
                 images = images.filter(tag__iexact=area)
             for img in images:
-                media.append({'type': 'image', 'url': _get_media_url(img.image)})
+                url = _get_media_url(img.image)
+                media.append({'type': 'image', 'url': url})
+                tag_label = img.tag if img.tag else 'sin etiqueta'
+                image_details.append(f"- Imagen ({tag_label}): {url}")
         if media_type in ('video', 'all'):
             video = prop.videos.first()
             if video:
-                media.append({'type': 'video', 'url': _get_media_url(video.video)})
+                url = _get_media_url(video.video)
+                media.append({'type': 'video', 'url': url})
+                image_details.append(f"- Video: {url}")
 
         area_label = f" del área '{area}'" if area else ""
-        result_msg = f"Se enviarán {len(media)} archivos multimedia de la propiedad {prop_id}{area_label}."
         if not media:
             result_msg = f"La propiedad {prop_id} no tiene {'imágenes' if media_type == 'images' else 'video' if media_type == 'video' else 'medios'}{area_label} disponibles."
+        else:
+            result_msg = f"Se enviarán {len(media)} archivos multimedia de la propiedad {prop_id}{area_label}. Detalle de lo enviado:\n" + '\n'.join(image_details)
         return json.dumps({'message': result_msg, 'media_count': len(media)}), media
 
     return json.dumps({'error': f'Función desconocida: {tool_name}'}), []
