@@ -85,7 +85,10 @@ export default function AnalyticsDashboard() {
   const [data, setData] = useState<Analytics | null>(null)
   const [intents, setIntents] = useState<Intent[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'stats' | 'intents'>('stats')
+  const [tab, setTab] = useState<'stats' | 'intents' | 'ai'>('stats')
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiConversations, setAiConversations] = useState(0)
 
   useEffect(() => {
     Promise.all([
@@ -97,6 +100,20 @@ export default function AnalyticsDashboard() {
       setLoading(false)
     })
   }, [])
+
+  const runAiAnalysis = async () => {
+    setAiLoading(true)
+    setAiAnalysis(null)
+    try {
+      const res = await api.post('/analytics/ai-analysis/')
+      setAiAnalysis(res.data.analysis)
+      setAiConversations(res.data.conversations_analyzed)
+    } catch {
+      setAiAnalysis('Error al generar el análisis. Intenta de nuevo.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   if (loading) return <p className="text-gray-500">Cargando análisis...</p>
   if (!data) return <p className="text-gray-500">Error al cargar datos</p>
@@ -121,6 +138,14 @@ export default function AnalyticsDashboard() {
           }`}
         >
           Intenciones ({intents.length})
+        </button>
+        <button
+          onClick={() => setTab('ai')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'ai' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          Análisis IA
         </button>
       </div>
 
@@ -187,7 +212,25 @@ export default function AnalyticsDashboard() {
                 intents.map((intent) => (
                   <tr key={intent.id}>
                     <td className="px-4 py-3 text-sm">
-                      {intent.phone || intent.session_id.slice(0, 8)}
+                      <div>{intent.phone || intent.session_id.slice(0, 8)}</div>
+                      {intent.phone && (
+                        <div className="flex gap-2 mt-1">
+                          <a
+                            href={`https://wa.me/${intent.phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green-600 hover:text-green-800 text-xs font-medium"
+                          >
+                            WhatsApp
+                          </a>
+                          <a
+                            href={`tel:${intent.phone}`}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                          >
+                            Llamar
+                          </a>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm">{intent.operacion || '-'}</td>
                     <td className="px-4 py-3 text-sm">{intent.tipo_propiedad || '-'}</td>
@@ -212,6 +255,46 @@ export default function AnalyticsDashboard() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === 'ai' && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">Análisis de estrategias de cierre</h3>
+              <p className="text-sm text-gray-500">Analiza conversaciones recientes con IA para identificar oportunidades de venta</p>
+            </div>
+            <button
+              onClick={runAiAnalysis}
+              disabled={aiLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {aiLoading ? 'Analizando...' : 'Iniciar análisis'}
+            </button>
+          </div>
+
+          {aiLoading && (
+            <div className="flex items-center gap-3 py-8 justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+              <span className="text-gray-500">Analizando conversaciones con GPT-4o...</span>
+            </div>
+          )}
+
+          {aiAnalysis && !aiLoading && (
+            <div>
+              <p className="text-xs text-gray-400 mb-3">{aiConversations} conversaciones analizadas</p>
+              <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
+                {aiAnalysis}
+              </div>
+            </div>
+          )}
+
+          {!aiAnalysis && !aiLoading && (
+            <p className="text-gray-400 text-sm py-8 text-center">
+              Haz clic en "Iniciar análisis" para generar recomendaciones basadas en las conversaciones recientes.
+            </p>
+          )}
         </div>
       )}
     </div>

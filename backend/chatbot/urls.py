@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import ChatView, ConversationListView, ChatHistoryView, SystemPromptView, PromptAnalysisView
 from .whatsapp import WhatsAppWebhookView
-from .analytics import AnalyticsView, IntentListView
+from .analytics import AnalyticsView, IntentListView, DealAnalysisView
 
 urlpatterns = [
     path('chat/', ChatView.as_view(), name='chat'),
@@ -12,4 +12,5 @@ urlpatterns = [
     path('intents/', IntentListView.as_view(), name='intent-list'),
     path('prompt/', SystemPromptView.as_view(), name='system-prompt'),
     path('prompt/analyze/', PromptAnalysisView.as_view(), name='prompt-analyze'),
+    path('analytics/ai-analysis/', DealAnalysisView.as_view(), name='deal-analysis'),
 ]
