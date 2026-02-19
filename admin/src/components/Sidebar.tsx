@@ -78,7 +78,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         className={`
           fixed top-0 left-0 z-50 h-full w-64 bg-gradient-to-b from-indigo-950 to-indigo-900 text-white flex flex-col
           transform transition-transform duration-300 ease-in-out
-          lg:static lg:translate-x-0 lg:z-auto
+          lg:static lg:translate-x-0 lg:z-auto lg:min-h-screen
           ${open ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
