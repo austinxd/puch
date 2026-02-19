@@ -76,6 +76,185 @@ type TagOption = [string, string]
 
 const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
 
+function MediaSection({
+  existingImages, newImages, existingVideos, newVideo, imageTags,
+  imageInputRef, videoInputRef,
+  onDeleteExistingImage, onUpdateExistingImageTag, onRemoveNewImage, onUpdateNewImageTag, onImageSelect,
+  onDeleteExistingVideo, onVideoSelect, onRemoveNewVideo,
+  recorrido360, onRecorridoChange, inputClass: ic,
+}: {
+  existingImages: PropertyImageData[]
+  newImages: NewImage[]
+  existingVideos: PropertyVideoData[]
+  newVideo: File | null
+  imageTags: TagOption[]
+  imageInputRef: React.RefObject<HTMLInputElement | null>
+  videoInputRef: React.RefObject<HTMLInputElement | null>
+  onDeleteExistingImage: (id: number) => void
+  onUpdateExistingImageTag: (id: number, tag: string) => void
+  onRemoveNewImage: (index: number) => void
+  onUpdateNewImageTag: (index: number, tag: string) => void
+  onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onDeleteExistingVideo: (id: number) => void
+  onVideoSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onRemoveNewVideo: () => void
+  recorrido360: string
+  onRecorridoChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  inputClass: string
+}) {
+  const [open, setOpen] = useState(false)
+  const mediaCount = existingImages.length + newImages.length + existingVideos.length + (newVideo ? 1 : 0)
+
+  return (
+    <section className="bg-white rounded-xl shadow-sm border border-gray-200/60 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-800">Medios</h3>
+          {mediaCount > 0 && (
+            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{mediaCount}</span>
+          )}
+        </div>
+        <svg
+          className={`w-5 h-5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-6 border-t border-gray-100">
+          {/* Images */}
+          <div className="pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-3">
+              {existingImages.map((img) => (
+                <div key={img.id} className="relative group">
+                  <img src={img.image} alt="" className="rounded-lg object-cover w-full h-32" />
+                  <button
+                    type="button"
+                    onClick={() => onDeleteExistingImage(img.id)}
+                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    X
+                  </button>
+                  <select
+                    value={img.tag}
+                    onChange={(e) => onUpdateExistingImageTag(img.id, e.target.value)}
+                    className="w-full mt-1 border border-gray-300 rounded px-2 py-1 text-xs"
+                  >
+                    <option value="">Sin tag</option>
+                    {imageTags.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              {newImages.map((img, i) => (
+                <div key={`new-${i}`} className="relative group">
+                  <img src={URL.createObjectURL(img.file)} alt="" className="rounded-lg object-cover w-full h-32" />
+                  <button
+                    type="button"
+                    onClick={() => onRemoveNewImage(i)}
+                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    X
+                  </button>
+                  <span className="absolute bottom-1 left-1 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded">Nueva</span>
+                  <select
+                    value={img.tag}
+                    onChange={(e) => onUpdateNewImageTag(i, e.target.value)}
+                    className="w-full mt-1 border border-gray-300 rounded px-2 py-1 text-xs"
+                  >
+                    <option value="">Sin tag</option>
+                    {imageTags.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onImageSelect}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
+            >
+              + Agregar imágenes
+            </button>
+          </div>
+
+          {/* Video */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Video</label>
+            {existingVideos.map((v) => (
+              <div key={v.id} className="flex items-center gap-3 mb-2">
+                <video src={v.video} className="rounded-lg h-32" controls />
+                <button
+                  type="button"
+                  onClick={() => onDeleteExistingVideo(v.id)}
+                  className="bg-red-600 text-white rounded-lg px-3 py-1 text-sm hover:bg-red-700 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ))}
+            {newVideo && (
+              <div className="flex items-center gap-3 mb-2">
+                <video src={URL.createObjectURL(newVideo)} className="rounded-lg h-32" controls />
+                <div>
+                  <span className="text-xs text-indigo-600 block mb-1">Nuevo</span>
+                  <button
+                    type="button"
+                    onClick={onRemoveNewVideo}
+                    className="bg-red-600 text-white rounded-lg px-3 py-1 text-sm hover:bg-red-700 transition-colors"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              </div>
+            )}
+            {existingVideos.length === 0 && !newVideo && (
+              <>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={onVideoSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
+                >
+                  + Agregar video
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Recorrido 360 */}
+          <Field label="Recorrido 360">
+            <input name="recorrido_360" value={recorrido360} onChange={onRecorridoChange} placeholder="URL recorrido 360" className={ic} />
+          </Field>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function PropertyForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -347,131 +526,26 @@ export default function PropertyForm() {
         </section>
 
         {/* Medios */}
-        <section>
-          <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Medios</h3>
-
-          {/* Images */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-3">
-              {existingImages.map((img) => (
-                <div key={img.id} className="relative group">
-                  <img src={img.image} alt="" className="rounded-lg object-cover w-full h-32" />
-                  <button
-                    type="button"
-                    onClick={() => deleteExistingImage(img.id)}
-                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    X
-                  </button>
-                  <select
-                    value={img.tag}
-                    onChange={(e) => updateExistingImageTag(img.id, e.target.value)}
-                    className="w-full mt-1 border border-gray-300 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">Sin tag</option>
-                    {imageTags.map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-              {newImages.map((img, i) => (
-                <div key={`new-${i}`} className="relative group">
-                  <img src={URL.createObjectURL(img.file)} alt="" className="rounded-lg object-cover w-full h-32" />
-                  <button
-                    type="button"
-                    onClick={() => removeNewImage(i)}
-                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    X
-                  </button>
-                  <span className="absolute bottom-1 left-1 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded">Nueva</span>
-                  <select
-                    value={img.tag}
-                    onChange={(e) => updateNewImageTag(i, e.target.value)}
-                    className="w-full mt-1 border border-gray-300 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">Sin tag</option>
-                    {imageTags.map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageSelect}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => imageInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-            >
-              + Agregar imágenes
-            </button>
-          </div>
-
-          {/* Video */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Video</label>
-            {existingVideos.map((v) => (
-              <div key={v.id} className="flex items-center gap-3 mb-2">
-                <video src={v.video} className="rounded-lg h-32" controls />
-                <button
-                  type="button"
-                  onClick={() => deleteExistingVideo(v.id)}
-                  className="bg-red-600 text-white rounded-lg px-3 py-1 text-sm hover:bg-red-700 transition-colors"
-                >
-                  Eliminar
-                </button>
-              </div>
-            ))}
-            {newVideo && (
-              <div className="flex items-center gap-3 mb-2">
-                <video src={URL.createObjectURL(newVideo)} className="rounded-lg h-32" controls />
-                <div>
-                  <span className="text-xs text-indigo-600 block mb-1">Nuevo</span>
-                  <button
-                    type="button"
-                    onClick={() => setNewVideo(null)}
-                    className="bg-red-600 text-white rounded-lg px-3 py-1 text-sm hover:bg-red-700 transition-colors"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              </div>
-            )}
-            {existingVideos.length === 0 && !newVideo && (
-              <>
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoSelect}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => videoInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-                >
-                  + Agregar video
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Recorrido 360 */}
-          <Field label="Recorrido 360">
-            <input name="recorrido_360" value={form.recorrido_360} onChange={handleChange} placeholder="URL recorrido 360" className={inputClass} />
-          </Field>
-        </section>
+        <MediaSection
+          existingImages={existingImages}
+          newImages={newImages}
+          existingVideos={existingVideos}
+          newVideo={newVideo}
+          imageTags={imageTags}
+          imageInputRef={imageInputRef}
+          videoInputRef={videoInputRef}
+          onDeleteExistingImage={deleteExistingImage}
+          onUpdateExistingImageTag={updateExistingImageTag}
+          onRemoveNewImage={removeNewImage}
+          onUpdateNewImageTag={updateNewImageTag}
+          onImageSelect={handleImageSelect}
+          onDeleteExistingVideo={deleteExistingVideo}
+          onVideoSelect={handleVideoSelect}
+          onRemoveNewVideo={() => setNewVideo(null)}
+          recorrido360={form.recorrido_360}
+          onRecorridoChange={handleChange}
+          inputClass={inputClass}
+        />
 
         {/* Documentación */}
         <section>

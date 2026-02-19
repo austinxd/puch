@@ -64,6 +64,54 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
   )
 }
 
+function MediaGallery({ images, videos, recorrido360 }: { images: string[]; videos: PropertyVideo[]; recorrido360: string }) {
+  const [open, setOpen] = useState(false)
+  const totalCount = images.length + videos.length + (recorrido360 ? 1 : 0)
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 mb-8 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-gray-900">Medios</h3>
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{totalCount}</span>
+        </div>
+        <svg
+          className={`w-5 h-5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-4">
+          {images.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {images.map((url, i) => (
+                <img key={i} src={url} alt={`Imagen ${i + 1}`} className="rounded-lg object-cover w-full h-48" />
+              ))}
+            </div>
+          )}
+
+          {videos[0] && (
+            <video src={videos[0].video} controls className="rounded-lg max-h-64 w-full" />
+          )}
+
+          {recorrido360 && (
+            <a href={recorrido360} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline text-sm block">
+              Recorrido 360
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PropertyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -100,12 +148,8 @@ export default function PropertyDetail() {
         </div>
       </div>
 
-      {images.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          {images.map((url, i) => (
-            <img key={i} src={url} alt={`Imagen ${i + 1}`} className="rounded-lg object-cover w-full h-48" />
-          ))}
-        </div>
+      {(images.length > 0 || property.videos.length > 0 || property.recorrido_360) && (
+        <MediaGallery images={images} videos={property.videos} recorrido360={property.recorrido_360} />
       )}
 
       {property.pitch && (
@@ -196,21 +240,7 @@ export default function PropertyDetail() {
         </div>
       )}
 
-      {(property.videos.length > 0 || property.recorrido_360) && (
-        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Medios</h3>
-          <div className="space-y-4">
-            {property.videos[0] && (
-              <video src={property.videos[0].video} controls className="rounded-lg max-h-64" />
-            )}
-            {property.recorrido_360 && (
-              <a href={property.recorrido_360} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline text-sm block">
-                Recorrido 360
-              </a>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Videos and recorrido moved into MediaGallery above */}
     </div>
   )
 }
