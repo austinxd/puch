@@ -87,7 +87,7 @@ export default function PropertyDetail() {
         <div className="flex gap-2">
           <button
             onClick={() => navigate(`/properties/${id}/edit`)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-indigo-700 transition-colors"
           >
             Editar
           </button>
@@ -109,13 +109,13 @@ export default function PropertyDetail() {
       )}
 
       {property.pitch && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-900">{property.pitch}</p>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-indigo-900">{property.pitch}</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Información General</h3>
           <dl className="divide-y divide-gray-100">
             <InfoRow label="Clase" value={property.clase} />
@@ -129,7 +129,7 @@ export default function PropertyDetail() {
           </dl>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Ubicación</h3>
           <dl className="divide-y divide-gray-100">
             <InfoRow label="Distrito" value={property.distrito} />
@@ -138,7 +138,7 @@ export default function PropertyDetail() {
             <InfoRow label="Referencia" value={property.referencia} />
             {property.link_maps && (
               <div className="py-2">
-                <a href={property.link_maps} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm">
+                <a href={property.link_maps} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline text-sm">
                   Ver en Google Maps
                 </a>
               </div>
@@ -146,7 +146,7 @@ export default function PropertyDetail() {
           </dl>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Características</h3>
           <dl className="divide-y divide-gray-100">
             <InfoRow label="Metraje" value={property.metraje} />
@@ -164,14 +164,14 @@ export default function PropertyDetail() {
           </dl>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Distribución</h3>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{property.distribucion || 'No especificada'}</p>
         </div>
       </div>
 
       {(property.documentacion || property.parametros_usos || property.financiamiento) && (
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
+        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Documentación y Financiamiento</h3>
           <dl className="space-y-4">
             {property.documentacion && (
@@ -197,14 +197,14 @@ export default function PropertyDetail() {
       )}
 
       {(property.videos.length > 0 || property.recorrido_360) && (
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
+        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Medios</h3>
           <div className="space-y-4">
             {property.videos[0] && (
               <video src={property.videos[0].video} controls className="rounded-lg max-h-64" />
             )}
             {property.recorrido_360 && (
-              <a href={property.recorrido_360} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm block">
+              <a href={property.recorrido_360} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline text-sm block">
                 Recorrido 360
               </a>
             )}

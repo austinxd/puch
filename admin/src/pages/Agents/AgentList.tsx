@@ -58,7 +58,7 @@ export default function AgentList() {
         <div className="flex gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); navigate(`/agents/${a.id}/edit`) }}
-            className="text-blue-600 hover:text-blue-800 text-sm"
+            className="text-indigo-600 hover:text-indigo-800 text-sm"
           >
             Editar
           </button>
@@ -79,7 +79,7 @@ export default function AgentList() {
         <h2 className="text-2xl font-bold text-gray-900">Agentes</h2>
         <button
           onClick={() => navigate('/agents/new')}
-          className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-indigo-700 transition-colors"
         >
           + Nuevo Agente
         </button>

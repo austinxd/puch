@@ -61,7 +61,7 @@ export default function PromptEditor() {
         <button
           onClick={() => setTab('editor')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'editor' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            tab === 'editor' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           Editor
@@ -69,7 +69,7 @@ export default function PromptEditor() {
         <button
           onClick={() => setTab('analysis')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'analysis' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            tab === 'analysis' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           Analisis
@@ -81,14 +81,14 @@ export default function PromptEditor() {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full h-[40vh] md:h-[60vh] p-4 border border-gray-300 rounded-lg font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full h-[40vh] md:h-[60vh] p-4 border border-gray-300 rounded-lg font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -110,7 +110,7 @@ export default function PromptEditor() {
 
       {tab === 'analysis' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
             <p className="text-gray-600 mb-4">
               Analiza las conversaciones recientes del chatbot usando IA para obtener sugerencias de mejora al prompt actual.
             </p>
@@ -118,21 +118,21 @@ export default function PromptEditor() {
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
               {analyzing ? 'Analizando...' : 'Analizar conversaciones'}
             </button>
           </div>
 
           {analyzing && (
-            <div className="bg-white rounded-lg shadow p-6 flex items-center gap-3">
-              <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6 flex items-center gap-3">
+              <div className="animate-spin h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full" />
               <span className="text-gray-600">Analizando conversaciones con IA, esto puede tomar un momento...</span>
             </div>
           )}
 
           {analysis && !analyzing && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Resultado del analisis</h3>
                 <span className="text-sm text-gray-500">

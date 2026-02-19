@@ -73,7 +73,7 @@ export default function PropertyList() {
         <div className="flex gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); navigate(`/properties/${p.id}/edit`) }}
-            className="text-blue-600 hover:text-blue-800 text-sm"
+            className="text-indigo-600 hover:text-indigo-800 text-sm"
           >
             Editar
           </button>
@@ -94,7 +94,7 @@ export default function PropertyList() {
         <h2 className="text-2xl font-bold text-gray-900">Propiedades</h2>
         <button
           onClick={() => navigate('/properties/new')}
-          className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-xl shadow-sm hover:bg-indigo-700 transition-colors"
         >
           + Nueva Propiedad
         </button>
@@ -107,7 +107,7 @@ export default function PropertyList() {
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           onKeyDown={(e) => e.key === 'Enter' && fetchProperties()}
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
         <select
           value={filters.clase}

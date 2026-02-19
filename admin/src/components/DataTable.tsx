@@ -16,7 +16,7 @@ export default function DataTable<T extends { id: number }>({
   onRowClick,
 }: DataTableProps<T>) {
   return (
-    <div className="overflow-x-auto bg-white rounded-lg shadow">
+    <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-gray-200/60">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>

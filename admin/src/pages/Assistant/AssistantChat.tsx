@@ -98,7 +98,7 @@ export default function AssistantChat() {
 
       <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Lista de conversaciones */}
-        <div className={`w-full md:w-80 md:shrink-0 bg-white rounded-lg shadow overflow-y-auto ${
+        <div className={`w-full md:w-80 md:shrink-0 bg-white rounded-xl shadow-sm border border-gray-200/60 overflow-y-auto ${
           selectedId ? 'hidden md:block' : ''
         }`}>
           {loading ? (
@@ -111,7 +111,7 @@ export default function AssistantChat() {
                 key={conv.session_id}
                 onClick={() => selectConversation(conv.session_id)}
                 className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                  selectedId === conv.session_id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
+                  selectedId === conv.session_id ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : ''
                 }`}
               >
                 {isPhone(conv.session_id) && (
@@ -136,7 +136,7 @@ export default function AssistantChat() {
         </div>
 
         {/* Detalle de conversación */}
-        <div className={`flex-1 bg-white rounded-lg shadow p-4 md:p-6 overflow-y-auto ${
+        <div className={`flex-1 bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 md:p-6 overflow-y-auto ${
           selectedId ? '' : 'hidden md:block'
         }`}>
           {!selectedId ? (

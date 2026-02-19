@@ -74,7 +74,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 type TagOption = [string, string]
 
-const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
 
 export default function PropertyForm() {
   const { id } = useParams()
@@ -247,7 +247,7 @@ export default function PropertyForm() {
             </Field>
             <Field label="Precio">
               <div className="flex gap-2">
-                <select name="moneda" value={form.moneda} onChange={handleChange} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-24">
+                <select name="moneda" value={form.moneda} onChange={handleChange} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-24">
                   <option value="USD">USD</option>
                   <option value="PEN">PEN</option>
                 </select>
@@ -386,7 +386,7 @@ export default function PropertyForm() {
                   >
                     X
                   </button>
-                  <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">Nueva</span>
+                  <span className="absolute bottom-1 left-1 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded">Nueva</span>
                   <select
                     value={img.tag}
                     onChange={(e) => updateNewImageTag(i, e.target.value)}
@@ -411,7 +411,7 @@ export default function PropertyForm() {
             <button
               type="button"
               onClick={() => imageInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+              className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
             >
               + Agregar imágenes
             </button>
@@ -436,7 +436,7 @@ export default function PropertyForm() {
               <div className="flex items-center gap-3 mb-2">
                 <video src={URL.createObjectURL(newVideo)} className="rounded-lg h-32" controls />
                 <div>
-                  <span className="text-xs text-blue-600 block mb-1">Nuevo</span>
+                  <span className="text-xs text-indigo-600 block mb-1">Nuevo</span>
                   <button
                     type="button"
                     onClick={() => setNewVideo(null)}
@@ -459,7 +459,7 @@ export default function PropertyForm() {
                 <button
                   type="button"
                   onClick={() => videoInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                  className="border-2 border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
                 >
                   + Agregar video
                 </button>
@@ -493,7 +493,7 @@ export default function PropertyForm() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="bg-indigo-600 text-white px-6 py-2 rounded-xl shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
             {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear'}
           </button>

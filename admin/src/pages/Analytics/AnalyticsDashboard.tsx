@@ -37,7 +37,7 @@ interface Intent {
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6 border-l-4 border-l-indigo-500">
       <p className="text-sm text-gray-500">{label}</p>
       <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
       {sub && <p className="text-sm text-gray-400 mt-1">{sub}</p>}
@@ -51,7 +51,7 @@ function BarChart({ data, label }: { data: Record<string, number>; label: string
 
   if (entries.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
         <h3 className="font-semibold text-gray-900 mb-4">{label}</h3>
         <p className="text-sm text-gray-400">Sin datos</p>
       </div>
@@ -59,7 +59,7 @@ function BarChart({ data, label }: { data: Record<string, number>; label: string
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
       <h3 className="font-semibold text-gray-900 mb-4">{label}</h3>
       <div className="space-y-3">
         {entries.map(([key, value]) => (
@@ -70,7 +70,7 @@ function BarChart({ data, label }: { data: Record<string, number>; label: string
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2">
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all"
+                className="bg-indigo-600 h-2 rounded-full transition-all"
                 style={{ width: `${(value / max) * 100}%` }}
               />
             </div>
@@ -126,7 +126,7 @@ export default function AnalyticsDashboard() {
         <button
           onClick={() => setTab('stats')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'stats' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            tab === 'stats' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           Estadísticas
@@ -134,7 +134,7 @@ export default function AnalyticsDashboard() {
         <button
           onClick={() => setTab('intents')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'intents' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            tab === 'intents' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           Intenciones ({intents.length})
@@ -142,7 +142,7 @@ export default function AnalyticsDashboard() {
         <button
           onClick={() => setTab('ai')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'ai' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            tab === 'ai' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           Análisis IA
@@ -188,7 +188,7 @@ export default function AnalyticsDashboard() {
       )}
 
       {tab === 'intents' && (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -259,7 +259,7 @@ export default function AnalyticsDashboard() {
       )}
 
       {tab === 'ai' && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-semibold text-gray-900">Análisis de estrategias de cierre</h3>
@@ -268,7 +268,7 @@ export default function AnalyticsDashboard() {
             <button
               onClick={runAiAnalysis}
               disabled={aiLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl shadow-sm text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {aiLoading ? 'Analizando...' : 'Iniciar análisis'}
             </button>
@@ -276,7 +276,7 @@ export default function AnalyticsDashboard() {
 
           {aiLoading && (
             <div className="flex items-center gap-3 py-8 justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600" />
               <span className="text-gray-500">Analizando conversaciones con GPT-4o...</span>
             </div>
           )}

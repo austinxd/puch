@@ -114,7 +114,7 @@ export default function AppointmentList() {
                   {grouped[dateKey].map((event) => (
                     <div
                       key={event.id}
-                      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex gap-4"
+                      className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 flex gap-4"
                     >
                       <div className="text-right shrink-0 w-20">
                         <p className="text-sm font-semibold text-gray-900">{formatTime(event.start)}</p>
@@ -145,7 +145,7 @@ export default function AppointmentList() {
             appointments.map((a) => {
               const s = statusLabels[a.status] || { label: a.status, className: 'bg-gray-50 text-gray-700 border-gray-200' }
               return (
-                <div key={a.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex gap-4">
+                <div key={a.id} className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 flex gap-4">
                   <div className="text-right shrink-0 w-20">
                     <p className="text-sm font-semibold text-gray-900">{formatTime(a.datetime_start)}</p>
                     <p className="text-xs text-gray-400">{formatTime(a.datetime_end)}</p>
