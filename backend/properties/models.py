@@ -29,7 +29,11 @@ class Property(models.Model):
         CASA_DE_PLAYA = 'Casa de playa', 'Casa de playa'
         CASA_DE_CAMPO = 'Casa de campo', 'Casa de campo'
         DEPARTAMENTO = 'Departamento', 'Departamento'
+        DUPLEX = 'Dúplex', 'Dúplex'
+        TRIPLEX = 'Triplex', 'Triplex'
         TERRENO = 'Terreno', 'Terreno'
+        LOCAL_INDUSTRIAL = 'Local industrial', 'Local industrial'
+        LOCAL_COMERCIAL = 'Local comercial', 'Local comercial'
 
     class Operacion(models.TextChoices):
         VENTA = 'Venta', 'Venta'
@@ -98,6 +102,16 @@ class PropertyImage(models.Model):
         ('lobby', 'Lobby'),
         ('piscina', 'Piscina'),
         ('areas_comunes', 'Áreas comunes'),
+        ('lavanderia', 'Lavandería'),
+        ('habitacion_principal', 'Habitación principal'),
+        ('bano_habitacion_principal', 'Baño Habitación Principal'),
+        ('bano_visitas', 'Baño de visitas'),
+        ('habitacion_secundaria_1', 'Habitación secundaria 1'),
+        ('habitacion_secundaria_2', 'Habitación secundaria 2'),
+        ('habitacion_secundaria_3', 'Habitación secundaria 3'),
+        ('estudio', 'Estudio'),
+        ('balcon', 'Balcón'),
+        ('cuarto_servicio', 'Cuarto de Servicio'),
     ]
 
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='images')

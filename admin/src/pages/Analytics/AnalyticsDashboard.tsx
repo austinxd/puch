@@ -122,7 +122,7 @@ export default function AnalyticsDashboard() {
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Análisis</h2>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 overflow-x-auto">
         <button
           onClick={() => setTab('stats')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${

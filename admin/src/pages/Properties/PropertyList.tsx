@@ -90,11 +90,11 @@ export default function PropertyList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Propiedades</h2>
         <button
           onClick={() => navigate('/properties/new')}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
         >
           + Nueva Propiedad
         </button>

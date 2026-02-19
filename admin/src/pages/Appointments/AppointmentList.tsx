@@ -76,9 +76,9 @@ export default function AppointmentList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Citas y Agenda</h2>
-        <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="flex bg-gray-100 rounded-lg p-1 self-center sm:self-auto">
           <button
             onClick={() => setView('calendar')}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${

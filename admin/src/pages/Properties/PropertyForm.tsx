@@ -199,7 +199,7 @@ export default function PropertyForm() {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         {isEdit ? 'Editar Propiedad' : 'Nueva Propiedad'}
       </h2>
-      <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl">
+      <form onSubmit={handleSubmit} className="space-y-8">
         {/* Info Básica */}
         <section>
           <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Información Básica</h3>
@@ -230,7 +230,11 @@ export default function PropertyForm() {
                 <option value="Casa de playa">Casa de playa</option>
                 <option value="Casa de campo">Casa de campo</option>
                 <option value="Departamento">Departamento</option>
+                <option value="Dúplex">Dúplex</option>
+                <option value="Triplex">Triplex</option>
                 <option value="Terreno">Terreno</option>
+                <option value="Local industrial">Local industrial</option>
+                <option value="Local comercial">Local comercial</option>
               </select>
             </Field>
             <Field label="Agente">
@@ -349,7 +353,7 @@ export default function PropertyForm() {
           {/* Images */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-3">
               {existingImages.map((img) => (
                 <div key={img.id} className="relative group">
                   <img src={img.image} alt="" className="rounded-lg object-cover w-full h-32" />
