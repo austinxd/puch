@@ -4,17 +4,21 @@ import uuid
 from django.conf import settings
 from django.db.models import Count, Max
 from openai import OpenAI
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from .models import ChatConversation, ChatMessage, SystemPrompt
 from .services import get_chat_response
+from properties.permissions import IsAdmin
 
 logger = logging.getLogger(__name__)
 
 
 class ChatView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         message = request.data.get('message', '').strip()
         session_id = request.data.get('session_id')
@@ -103,6 +107,8 @@ class ChatHistoryView(APIView):
 
 
 class SystemPromptView(APIView):
+    permission_classes = [IsAdmin]
+
     def get(self, request):
         try:
             prompt = SystemPrompt.objects.get(pk=1)
@@ -133,6 +139,8 @@ class SystemPromptView(APIView):
 
 
 class PromptAnalysisView(APIView):
+    permission_classes = [IsAdmin]
+
     def post(self, request):
         if not settings.OPENAI_API_KEY:
             return Response(

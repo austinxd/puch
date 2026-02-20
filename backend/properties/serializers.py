@@ -1,13 +1,58 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from .models import Agent, Appointment, Property, PropertyImage, PropertyVideo
+
+User = get_user_model()
 
 
 class AgentSerializer(serializers.ModelSerializer):
     google_calendar_connected = serializers.BooleanField(read_only=True)
+    username = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Agent
-        fields = ['id', 'name', 'phone', 'email', 'google_calendar_connected']
+        fields = ['id', 'name', 'phone', 'email', 'google_calendar_connected', 'username', 'password']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.user:
+            data['username'] = instance.user.username
+        else:
+            data['username'] = ''
+        return data
+
+    def create(self, validated_data):
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+        agent = Agent.objects.create(**validated_data)
+        if username and password:
+            user = User.objects.create_user(username=username, password=password)
+            agent.user = user
+            agent.save()
+        return agent
+
+    def update(self, instance, validated_data):
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if username or password:
+            if instance.user:
+                if username:
+                    instance.user.username = username
+                if password:
+                    instance.user.set_password(password)
+                instance.user.save()
+            elif username and password:
+                user = User.objects.create_user(username=username, password=password)
+                instance.user = user
+                instance.save()
+
+        return instance
 
 
 class PropertyImageSerializer(serializers.ModelSerializer):

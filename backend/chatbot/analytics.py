@@ -6,12 +6,15 @@ from openai import OpenAI
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from properties.permissions import IsAdmin
 from .models import ChatConversation, ChatMessage, ClientIntent
 
 logger = logging.getLogger(__name__)
 
 
 class AnalyticsView(APIView):
+    permission_classes = [IsAdmin]
+
     def get(self, request):
         """Dashboard statistics."""
         conversations = ChatConversation.objects.annotate(
@@ -105,6 +108,8 @@ class AnalyticsView(APIView):
 
 
 class IntentListView(APIView):
+    permission_classes = [IsAdmin]
+
     def get(self, request):
         """List all client intents for follow-up."""
         intents = ClientIntent.objects.select_related('conversation').all()
@@ -130,6 +135,8 @@ class IntentListView(APIView):
 
 
 class DealAnalysisView(APIView):
+    permission_classes = [IsAdmin]
+
     def post(self, request):
         if not settings.OPENAI_API_KEY:
             return Response(

@@ -7,6 +7,7 @@ from .views import (
     PropertyVideoView, PropertyVideoDetailView,
 )
 from .google_auth import GoogleConnectView, GoogleCallbackView, DisconnectGoogleView
+from .auth_views import LoginView, LogoutView, MeView, MyProfileView
 
 router = DefaultRouter()
 router.register(r'properties', PropertyViewSet)
@@ -14,6 +15,11 @@ router.register(r'agents', AgentViewSet)
 router.register(r'appointments', AppointmentViewSet)
 
 urlpatterns = [
+    # Auth
+    path('auth/login/', LoginView.as_view(), name='auth-login'),
+    path('auth/logout/', LogoutView.as_view(), name='auth-logout'),
+    path('auth/me/', MeView.as_view(), name='auth-me'),
+    path('auth/profile/', MyProfileView.as_view(), name='auth-profile'),
     # Property media (before router so they don't get caught by properties/<pk>/)
     path('properties/image-tags/', ImageTagsView.as_view(), name='image-tags'),
     path('properties/<int:property_id>/images/', PropertyImageView.as_view(), name='property-images'),

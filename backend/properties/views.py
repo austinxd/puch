@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .models import Agent, Appointment, Property, PropertyImage, PropertyVideo
+from .permissions import IsAdmin
 from .serializers import (
     AgentSerializer, AppointmentSerializer, PropertySerializer,
     PropertyListSerializer, PropertyImageSerializer, PropertyVideoSerializer,
@@ -17,6 +18,7 @@ class AgentViewSet(viewsets.ModelViewSet):
     queryset = Agent.objects.all()
     serializer_class = AgentSerializer
     search_fields = ['name', 'email']
+    permission_classes = [IsAdmin]
 
 
 class PropertyViewSet(viewsets.ModelViewSet):
@@ -30,6 +32,18 @@ class PropertyViewSet(viewsets.ModelViewSet):
             return PropertyListSerializer
         return PropertySerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if not self.request.user.is_staff:
+            qs = qs.filter(agent=self.request.user.agent_profile)
+        return qs
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_staff:
+            serializer.save(agent=self.request.user.agent_profile)
+        else:
+            serializer.save()
+
 
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.select_related('property', 'agent').all()
@@ -38,15 +52,28 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     search_fields = ['client_name', 'client_phone', 'property__identificador']
     ordering_fields = ['datetime_start', 'created_at']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if not self.request.user.is_staff:
+            qs = qs.filter(agent=self.request.user.agent_profile)
+        return qs
+
 
 class CalendarEventsView(APIView):
-    """Fetch Google Calendar events for all connected agents."""
+    """Fetch Google Calendar events for connected agents."""
 
     def get(self, request):
         date_from = request.query_params.get('from', date.today().strftime('%Y-%m-%d'))
         date_to = request.query_params.get('to', (date.today() + timedelta(days=30)).strftime('%Y-%m-%d'))
 
-        agents = Agent.objects.filter(google_calendar_connected=True)
+        if request.user.is_staff:
+            agents = Agent.objects.filter(google_calendar_connected=True)
+        else:
+            agents = Agent.objects.filter(
+                id=request.user.agent_profile.id,
+                google_calendar_connected=True,
+            )
+
         all_events = []
         for agent in agents:
             result = get_calendar_events(agent.id, date_from, date_to)

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
 
-interface AgentForm {
+interface AgentFormData {
   name: string
   phone: string
   email: string
+  username: string
+  password: string
   google_calendar_connected?: boolean
 }
 
@@ -14,13 +16,13 @@ export default function AgentForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const isEdit = Boolean(id)
-  const [form, setForm] = useState<AgentForm>({ name: '', phone: '', email: '' })
+  const [form, setForm] = useState<AgentFormData>({ name: '', phone: '', email: '', username: '', password: '' })
   const [saving, setSaving] = useState(false)
   const [googleStatus, setGoogleStatus] = useState<string | null>(null)
 
   useEffect(() => {
     if (isEdit) {
-      api.get(`/agents/${id}/`).then((res) => setForm(res.data))
+      api.get(`/agents/${id}/`).then((res) => setForm({ ...res.data, password: '' }))
     }
   }, [id])
 
@@ -28,8 +30,7 @@ export default function AgentForm() {
     const googleParam = searchParams.get('google')
     if (googleParam === 'connected') {
       setGoogleStatus('connected')
-      // Refresh agent data to get updated google_calendar_connected
-      if (id) api.get(`/agents/${id}/`).then((res) => setForm(res.data))
+      if (id) api.get(`/agents/${id}/`).then((res) => setForm({ ...res.data, password: '' }))
     } else if (googleParam === 'error') {
       setGoogleStatus('error')
     }
@@ -43,10 +44,15 @@ export default function AgentForm() {
     e.preventDefault()
     setSaving(true)
     const { google_calendar_connected, ...payload } = form
+    // Don't send empty password on edit
+    const data: Record<string, string> = { ...payload }
+    if (isEdit && !data.password) {
+      delete data.password
+    }
     if (isEdit) {
-      await api.put(`/agents/${id}/`, payload)
+      await api.put(`/agents/${id}/`, data)
     } else {
-      await api.post('/agents/', payload)
+      await api.post('/agents/', data)
     }
     setSaving(false)
     navigate('/agents')
@@ -83,6 +89,39 @@ export default function AgentForm() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} />
+        </div>
+
+        {/* Credentials */}
+        <div className="border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Credenciales de acceso</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Usuario *</label>
+              <input
+                name="username"
+                value={form.username}
+                onChange={handleChange}
+                required
+                autoComplete="off"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contraseña {isEdit ? '' : '*'}
+              </label>
+              <input
+                name="password"
+                type="password"
+                value={form.password}
+                onChange={handleChange}
+                required={!isEdit}
+                autoComplete="new-password"
+                placeholder={isEdit ? 'Dejar vacío para mantener actual' : ''}
+                className={inputClass}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Google Calendar Section */}
