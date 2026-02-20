@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
-import { useAuth } from '../../contexts/AuthContext'
 
 interface ProfileData {
   id: number
@@ -12,7 +11,6 @@ interface ProfileData {
 }
 
 export default function MyProfile() {
-  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [form, setForm] = useState({ name: '', phone: '', email: '' })
