@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from django.conf import settings
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Max, Q, Subquery, OuterRef
 from django.utils import timezone
 from openai import OpenAI
 from rest_framework.permissions import AllowAny
@@ -74,41 +74,59 @@ class ChatView(APIView):
 
 
 class ConversationListView(APIView):
+    permission_classes = [IsAdmin]
+
     def get(self, request):
+        # Subquery for first user message preview (avoids N+1)
+        first_user_msg = (
+            ChatMessage.objects
+            .filter(conversation=OuterRef('pk'), role='user')
+            .order_by('created_at')
+            .values('content')[:1]
+        )
+
         conversations = (
             ChatConversation.objects
             .annotate(
-                message_count=Count('messages'),
+                message_count=Count('messages', distinct=True),
                 last_message_at=Max('messages__created_at'),
+                preview_raw=Subquery(first_user_msg),
             )
             .filter(message_count__gt=0)
         )
 
         search = request.query_params.get('search', '').strip()
         if search:
+            # Use a subquery to check message content without inflating counts
+            matching_convs = (
+                ChatMessage.objects
+                .filter(content__icontains=search)
+                .values('conversation_id')
+            )
             conversations = conversations.filter(
                 Q(session_id__icontains=search) |
-                Q(messages__content__icontains=search)
-            ).distinct()
+                Q(pk__in=matching_convs)
+            )
 
         conversations = conversations.order_by('-last_message_at')
 
-        # Get first user message as preview for each conversation
         results = []
         for conv in conversations:
-            first_msg = conv.messages.filter(role='user').first()
+            preview = (conv.preview_raw or '')[:100]
             results.append({
                 'session_id': str(conv.session_id),
                 'created_at': conv.created_at,
                 'message_count': conv.message_count,
                 'last_message_at': conv.last_message_at,
-                'preview': first_msg.content[:100] if first_msg else '',
+                'preview': preview,
             })
 
         return Response({'results': results})
 
 
 class ChatHistoryView(APIView):
+    permission_classes = [IsAdmin]
+
     def get(self, request, session_id):
         try:
             conversation = ChatConversation.objects.get(session_id=session_id)

@@ -21,24 +21,60 @@ def get_system_prompt():
         return "Eres Erika, asesora inmobiliaria virtual de Brikia en Lima, Perú."
 
 
-def search_properties(message):
-    """Search for relevant properties based on the user message."""
-    keywords = re.findall(r'\w+', message.lower())
-    stopwords = {
-        'busco', 'quiero', 'necesito', 'un', 'una', 'el', 'la', 'los', 'las',
-        'de', 'en', 'con', 'para', 'por', 'que', 'es', 'y', 'o', 'me', 'mi',
-        'hay', 'tiene', 'tienen', 'algo', 'como', 'más', 'mas', 'muy', 'bien',
-        'hola', 'gracias', 'favor', 'puedes', 'puedo', 'sí', 'si', 'no',
-        'a', 'al', 'del', 'se', 'lo', 'le', 'su', 'sus', 'este', 'esta',
-        'información', 'informacion', 'info', 'sobre', 'detalles',
-    }
-    keywords = [k for k in keywords if k not in stopwords and len(k) > 2]
+SEARCH_STOPWORDS = {
+    'busco', 'quiero', 'necesito', 'un', 'una', 'el', 'la', 'los', 'las',
+    'de', 'en', 'con', 'para', 'por', 'que', 'es', 'y', 'o', 'me', 'mi',
+    'hay', 'tiene', 'tienen', 'algo', 'como', 'más', 'mas', 'muy', 'bien',
+    'hola', 'gracias', 'favor', 'puedes', 'puedo', 'sí', 'si', 'no',
+    'a', 'al', 'del', 'se', 'lo', 'le', 'su', 'sus', 'este', 'esta',
+    'información', 'informacion', 'info', 'sobre', 'detalles',
+    'ver', 'foto', 'fotos', 'video', 'videos', 'imagen', 'imágenes',
+    'precio', 'cita', 'visita', 'agendar', 'sacame', 'sacar', 'mañana',
+    'hoy', 'pasado', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes',
+    'sábado', 'domingo', 'porfavor', 'por', 'quiero', 'quisiera',
+    'recorrido', 'enviar', 'mandar', 'dame', 'dime', 'puedo',
+    'otra', 'otro', 'más', 'también', 'tambien', 'todas', 'todos',
+}
 
-    query = Q(activo=True)
+
+def _extract_keywords(text):
+    """Extract meaningful keywords from text, filtering stopwords."""
+    words = re.findall(r'\w+', text.lower())
+    return [w for w in words if w not in SEARCH_STOPWORDS and len(w) > 2]
+
+
+def search_properties(conversation_messages):
+    """Search for relevant properties based on all user messages in the conversation.
+
+    Args:
+        conversation_messages: list of message dicts with 'role' and 'content' keys,
+                              or a single string (for backward compatibility).
+    """
+    # Build combined text from all user messages in the conversation
+    if isinstance(conversation_messages, str):
+        combined_text = conversation_messages
+    else:
+        combined_text = ' '.join(
+            msg['content'] for msg in conversation_messages
+            if msg.get('role') == 'user'
+        )
+
+    keywords = _extract_keywords(combined_text)
+    if not keywords:
+        return Property.objects.none()
+
+    # Step 1: Exact identifier match (highest priority)
+    id_filter = Q()
+    for kw in keywords:
+        id_filter |= Q(identificador__iexact=kw)
+    id_matches = Property.objects.filter(Q(activo=True) & id_filter).select_related('agent').prefetch_related('images', 'videos')
+    if id_matches.exists():
+        return id_matches[:10]
+
+    # Step 2: Full keyword search across all property fields + agent name
     keyword_filter = Q()
     for kw in keywords:
         keyword_filter |= (
-            Q(identificador__iexact=kw) |
             Q(distrito__icontains=kw) |
             Q(tipologia__icontains=kw) |
             Q(nombre__icontains=kw) |
@@ -46,10 +82,12 @@ def search_properties(message):
             Q(clase__icontains=kw) |
             Q(operacion__icontains=kw) |
             Q(habitaciones__icontains=kw) |
-            Q(calle__icontains=kw)
+            Q(calle__icontains=kw) |
+            Q(agent__name__icontains=kw)
         )
 
-    price_match = re.search(r'(\d[\d,\.]*)\s*(mil|k|soles|dolares|usd|\$)', message.lower())
+    # Apply price filter if mentioned
+    price_match = re.search(r'(\d[\d,\.]*)\s*(mil|k|soles|dolares|usd|\$)', combined_text.lower())
     if price_match:
         price_str = price_match.group(1).replace(',', '').replace('.', '')
         multiplier = 1000 if price_match.group(2) in ('mil', 'k') else 1
@@ -59,17 +97,16 @@ def search_properties(message):
         except ValueError:
             pass
 
-    properties = Property.objects.filter(query & keyword_filter).select_related('agent').prefetch_related('images', 'videos')[:5]
+    properties = Property.objects.filter(Q(activo=True) & keyword_filter).select_related('agent').prefetch_related('images', 'videos')[:10]
 
-    if not properties.exists() and keywords:
-        broad_filter = Q()
-        for kw in keywords[:3]:
-            broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw) | Q(identificador__icontains=kw)
-        properties = Property.objects.filter(query & broad_filter).select_related('agent').prefetch_related('images', 'videos')[:5]
-
+    # Step 3: Broader fallback (only distrito, tipologia, identificador)
     if not properties.exists():
-        properties = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')[:5]
+        broad_filter = Q()
+        for kw in keywords[:5]:
+            broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw) | Q(agent__name__icontains=kw)
+        properties = Property.objects.filter(Q(activo=True) & broad_filter).select_related('agent').prefetch_related('images', 'videos')[:10]
 
+    # NO random fallback — if nothing matches, return empty
     return properties
 
 
@@ -392,15 +429,25 @@ def get_chat_response(conversation, user_message):
             'media': [],
         }
 
-    history = conversation.messages.order_by('-created_at')[:10]
+    history = conversation.messages.order_by('-created_at')[:30]
     history = list(reversed(history))
 
-    properties = search_properties(user_message)
+    # Build conversation context for property search (all user messages)
+    conversation_msgs = [
+        {'role': msg.role, 'content': msg.content}
+        for msg in history
+    ]
+    # Include the current message in the search context
+    conversation_msgs.append({'role': 'user', 'content': user_message})
+
+    properties = search_properties(conversation_msgs)
     property_context = ""
     if properties:
         formatted = [format_property(p) for p in properties]
         property_context = (
             "\n\n=== PROPIEDADES EN BASE DE DATOS ===\n"
+            "IMPORTANTE: Solo menciona información que aparece explícitamente aquí. "
+            "Si un campo no aparece o dice NO, no inventes ni asumas que existe.\n"
             + "\n\n".join(formatted)
             + "\n=== FIN DE PROPIEDADES ==="
         )
@@ -414,6 +461,7 @@ def get_chat_response(conversation, user_message):
         " El detalle te indica exactamente qué imágenes se enviaron y de qué área son (fachada, sala, cocina, etc.)."
         " NUNCA te disculpes ni digas que cometiste un error si el envío fue exitoso."
         " Si el cliente pregunta de qué es una foto, responde con seguridad usando el tag de la imagen."
+        " NUNCA mezcles información de una propiedad con otra. Cada propiedad tiene su propio identificador."
     )
 
     messages = [
