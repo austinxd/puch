@@ -2,7 +2,8 @@ import json
 import logging
 import uuid
 from django.conf import settings
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
+from django.utils import timezone
 from openai import OpenAI
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
@@ -11,6 +12,7 @@ from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from .models import ChatConversation, ChatMessage, SystemPrompt
 from .services import get_chat_response
+from .whatsapp import send_whatsapp_message
 from properties.permissions import IsAdmin
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,15 @@ class ChatView(APIView):
             role=ChatMessage.Role.USER,
             content=message,
         )
+
+        # If AI is paused by admin, save message but skip AI response
+        if conversation.is_ai_paused:
+            return Response({
+                'session_id': session_id,
+                'reply': '',
+                'media': [],
+                'ai_paused': True,
+            })
 
         response = get_chat_response(conversation, message)
         reply = response['text']
@@ -71,8 +82,16 @@ class ConversationListView(APIView):
                 last_message_at=Max('messages__created_at'),
             )
             .filter(message_count__gt=0)
-            .order_by('-last_message_at')
         )
+
+        search = request.query_params.get('search', '').strip()
+        if search:
+            conversations = conversations.filter(
+                Q(session_id__icontains=search) |
+                Q(messages__content__icontains=search)
+            ).distinct()
+
+        conversations = conversations.order_by('-last_message_at')
 
         # Get first user message as preview for each conversation
         results = []
@@ -100,9 +119,17 @@ class ChatHistoryView(APIView):
             )
 
         messages = conversation.messages.all().values('role', 'content', 'created_at')
+
+        pause_remaining = 0
+        if conversation.is_ai_paused:
+            pause_remaining = int((conversation.admin_paused_until - timezone.now()).total_seconds())
+
         return Response({
             'session_id': str(session_id),
             'messages': list(messages),
+            'is_ai_paused': conversation.is_ai_paused,
+            'admin_paused_until': conversation.admin_paused_until,
+            'pause_remaining_seconds': pause_remaining,
         })
 
 
@@ -217,3 +244,53 @@ Responde en español, de forma estructurada y accionable."""
             'analysis': analysis,
             'conversations_analyzed': len(conversation_samples),
         })
+
+
+class AdminReplyView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, session_id):
+        message = request.data.get('message', '').strip()
+        if not message:
+            return Response(
+                {'error': 'El mensaje es requerido'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            conversation = ChatConversation.objects.get(session_id=session_id)
+        except ChatConversation.DoesNotExist:
+            return Response(
+                {'error': 'Conversación no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        ChatMessage.objects.create(
+            conversation=conversation,
+            role=ChatMessage.Role.ADMIN,
+            content=message,
+        )
+
+        conversation.pause_ai(minutes=30)
+
+        # If session_id is a phone number, send via WhatsApp
+        if session_id.isdigit() and len(session_id) >= 7:
+            send_whatsapp_message(session_id, message)
+
+        return Response({'status': 'sent', 'ai_paused_until': conversation.admin_paused_until})
+
+
+class AdminUnpauseView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, session_id):
+        try:
+            conversation = ChatConversation.objects.get(session_id=session_id)
+        except ChatConversation.DoesNotExist:
+            return Response(
+                {'error': 'Conversación no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        conversation.unpause_ai()
+        return Response({'status': 'unpaused'})

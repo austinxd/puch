@@ -1,10 +1,12 @@
 import uuid
 from django.db import models
+from django.utils import timezone
 
 
 class ChatConversation(models.Model):
     session_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
+    admin_paused_until = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -12,11 +14,24 @@ class ChatConversation(models.Model):
     def __str__(self):
         return str(self.session_id)
 
+    @property
+    def is_ai_paused(self):
+        return self.admin_paused_until and self.admin_paused_until > timezone.now()
+
+    def pause_ai(self, minutes=30):
+        self.admin_paused_until = timezone.now() + timezone.timedelta(minutes=minutes)
+        self.save(update_fields=['admin_paused_until'])
+
+    def unpause_ai(self):
+        self.admin_paused_until = None
+        self.save(update_fields=['admin_paused_until'])
+
 
 class ChatMessage(models.Model):
     class Role(models.TextChoices):
         USER = 'user', 'User'
         ASSISTANT = 'assistant', 'Assistant'
+        ADMIN = 'admin', 'Admin'
 
     conversation = models.ForeignKey(
         ChatConversation, on_delete=models.CASCADE, related_name='messages'

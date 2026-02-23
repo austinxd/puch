@@ -126,6 +126,11 @@ class WhatsAppWebhookView(View):
                         content=text,
                     )
 
+                    # If AI is paused by admin, save message but skip AI response
+                    if conversation.is_ai_paused:
+                        logger.info(f"AI paused for {phone}, skipping response")
+                        continue
+
                     # Get AI response (now returns dict with text and media)
                     response = get_chat_response(conversation, text)
                     reply = response['text']

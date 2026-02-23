@@ -416,7 +416,9 @@ def get_chat_response(conversation, user_message):
         {"role": "system", "content": system_prompt + property_context + media_instructions}
     ]
     for msg in history[:-1]:
-        messages.append({"role": msg.role, "content": msg.content})
+        # Map admin messages to assistant role for OpenAI
+        role = 'assistant' if msg.role == 'admin' else msg.role
+        messages.append({"role": role, "content": msg.content})
     messages.append({"role": "user", "content": user_message})
 
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
