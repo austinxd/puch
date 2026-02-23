@@ -28,7 +28,7 @@ export default function AssistantChat() {
 
   // Search
   const [searchQuery, setSearchQuery] = useState('')
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   // Admin reply
   const [replyText, setReplyText] = useState('')
