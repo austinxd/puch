@@ -5,8 +5,9 @@ from datetime import date
 
 from django.conf import settings
 from django.db.models import Q
+from django.utils import timezone
 from openai import OpenAI
-from properties.models import Property, Agent
+from properties.models import Property, Agent, Appointment
 from properties.calendar_service import check_availability, create_appointment
 
 logger = logging.getLogger(__name__)
@@ -43,31 +44,22 @@ def _extract_keywords(text):
     return [w for w in words if w not in SEARCH_STOPWORDS and len(w) > 2]
 
 
-def search_properties(conversation_messages):
-    """Search for relevant properties based on all user messages in the conversation.
+def _search_by_text(text):
+    """Search properties by a text string using identifier, keyword, and broad strategies.
 
-    Args:
-        conversation_messages: list of message dicts with 'role' and 'content' keys,
-                              or a single string (for backward compatibility).
+    Returns a queryset of matching properties, or an empty queryset if nothing matches.
     """
-    # Build combined text from all user messages in the conversation
-    if isinstance(conversation_messages, str):
-        combined_text = conversation_messages
-    else:
-        combined_text = ' '.join(
-            msg['content'] for msg in conversation_messages
-            if msg.get('role') == 'user'
-        )
-
-    keywords = _extract_keywords(combined_text)
+    keywords = _extract_keywords(text)
     if not keywords:
         return Property.objects.none()
+
+    base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
 
     # Step 1: Exact identifier match (highest priority)
     id_filter = Q()
     for kw in keywords:
         id_filter |= Q(identificador__iexact=kw)
-    id_matches = Property.objects.filter(Q(activo=True) & id_filter).select_related('agent').prefetch_related('images', 'videos')
+    id_matches = base_qs.filter(id_filter)
     if id_matches.exists():
         return id_matches[:10]
 
@@ -87,7 +79,7 @@ def search_properties(conversation_messages):
         )
 
     # Apply price filter if mentioned
-    price_match = re.search(r'(\d[\d,\.]*)\s*(mil|k|soles|dolares|usd|\$)', combined_text.lower())
+    price_match = re.search(r'(\d[\d,\.]*)\s*(mil|k|soles|dolares|usd|\$)', text.lower())
     if price_match:
         price_str = price_match.group(1).replace(',', '').replace('.', '')
         multiplier = 1000 if price_match.group(2) in ('mil', 'k') else 1
@@ -97,17 +89,42 @@ def search_properties(conversation_messages):
         except ValueError:
             pass
 
-    properties = Property.objects.filter(Q(activo=True) & keyword_filter).select_related('agent').prefetch_related('images', 'videos')[:10]
+    properties = base_qs.filter(keyword_filter)[:10]
 
-    # Step 3: Broader fallback (only distrito, tipologia, identificador)
+    # Step 3: Broader fallback (only distrito, tipologia, agent name)
     if not properties.exists():
         broad_filter = Q()
         for kw in keywords[:5]:
             broad_filter |= Q(distrito__icontains=kw) | Q(tipologia__icontains=kw) | Q(agent__name__icontains=kw)
-        properties = Property.objects.filter(Q(activo=True) & broad_filter).select_related('agent').prefetch_related('images', 'videos')[:10]
+        properties = base_qs.filter(broad_filter)[:10]
 
-    # NO random fallback — if nothing matches, return empty
     return properties
+
+
+def search_properties(current_message, conversation_messages=None):
+    """Hybrid property search: try current message first, fall back to full history.
+
+    This prevents old messages from dominating results when the user changes topic.
+
+    Args:
+        current_message: the latest user message string.
+        conversation_messages: optional list of message dicts with 'role' and 'content' keys
+                              (full conversation history for fallback).
+    """
+    # Try searching with the current message only
+    results = _search_by_text(current_message)
+    if results.exists():
+        return results
+
+    # Fallback: search with full conversation history
+    if conversation_messages:
+        combined_text = ' '.join(
+            msg['content'] for msg in conversation_messages
+            if msg.get('role') == 'user'
+        )
+        return _search_by_text(combined_text)
+
+    return Property.objects.none()
 
 
 def _get_media_url(file_field):
@@ -432,15 +449,14 @@ def get_chat_response(conversation, user_message):
     history = conversation.messages.order_by('-created_at')[:30]
     history = list(reversed(history))
 
-    # Build conversation context for property search (all user messages)
+    # Build conversation context for property search fallback (all user messages)
     conversation_msgs = [
         {'role': msg.role, 'content': msg.content}
         for msg in history
     ]
-    # Include the current message in the search context
     conversation_msgs.append({'role': 'user', 'content': user_message})
 
-    properties = search_properties(conversation_msgs)
+    properties = search_properties(user_message, conversation_messages=conversation_msgs)
     property_context = ""
     if properties:
         formatted = [format_property(p) for p in properties]
@@ -451,6 +467,33 @@ def get_chat_response(conversation, user_message):
             + "\n\n".join(formatted)
             + "\n=== FIN DE PROPIEDADES ==="
         )
+
+    # Query future scheduled appointments for this conversation
+    appointment_context = ""
+    appointments = Appointment.objects.filter(
+        Q(conversation_session_id=conversation.session_id) |
+        Q(client_phone=conversation.session_id),
+        status=Appointment.Status.SCHEDULED,
+        datetime_start__gte=timezone.now(),
+    ).select_related('property', 'agent').order_by('datetime_start')
+
+    if appointments.exists():
+        appt_lines = [
+            "\n\n=== CITAS ACTIVAS DEL CLIENTE ===",
+            "El cliente tiene citas programadas. Ayúdalo con dirección, cómo llegar, detalles de la visita.",
+        ]
+        for appt in appointments:
+            local_dt = timezone.localtime(appt.datetime_start)
+            line = f"- Propiedad: {appt.property.nombre} ({appt.property.identificador}) el {local_dt.strftime('%Y-%m-%d')} a las {local_dt.strftime('%H:%M')}"
+            appt_lines.append(line)
+            if appt.property.direccion:
+                appt_lines.append(f"  Dirección: {appt.property.direccion}")
+            if appt.property.link_maps:
+                appt_lines.append(f"  Link Maps: {appt.property.link_maps}")
+            if appt.agent:
+                appt_lines.append(f"  Agente: {appt.agent.name} (Tel: {appt.agent.phone})")
+        appt_lines.append("=== FIN DE CITAS ===")
+        appointment_context = '\n'.join(appt_lines)
 
     # Inject current date into the system prompt
     system_prompt = get_system_prompt().replace('{current_date}', date.today().strftime('%Y-%m-%d (%A)'))
@@ -465,7 +508,7 @@ def get_chat_response(conversation, user_message):
     )
 
     messages = [
-        {"role": "system", "content": system_prompt + property_context + media_instructions}
+        {"role": "system", "content": system_prompt + property_context + appointment_context + media_instructions}
     ]
     for msg in history[:-1]:
         # Map admin messages to assistant role for OpenAI
