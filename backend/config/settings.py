@@ -158,4 +158,7 @@ WHATSAPP_VERIFY_TOKEN = os.environ.get('WHATSAPP_VERIFY_TOKEN', '')
 WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
 WHATSAPP_PHONE_ID = os.environ.get('WHATSAPP_PHONE_ID', '')
 
+# Resend (email notifications)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

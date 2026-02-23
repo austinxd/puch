@@ -336,6 +336,33 @@ def create_appointment(agent_id, property_id, client_name, client_phone, date_st
         conversation_session_id=session_id,
     )
 
+    # Send email notification to agent
+    if agent.email and settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                'from': 'Brikia <notificaciones@brikia.tech>',
+                'to': [agent.email],
+                'subject': f'Nueva cita: {client_name} - {prop.identificador}',
+                'html': (
+                    f'<div style="font-family:sans-serif;max-width:600px;margin:0 auto">'
+                    f'<h2 style="color:#2563eb">Nueva cita agendada</h2>'
+                    f'<p>Se ha agendado una nueva visita desde el chatbot de Brikia.</p>'
+                    f'<table style="border-collapse:collapse;width:100%">'
+                    f'<tr><td style="padding:8px;font-weight:bold">Cliente</td><td style="padding:8px">{client_name}</td></tr>'
+                    f'<tr><td style="padding:8px;font-weight:bold">Teléfono</td><td style="padding:8px">{client_phone}</td></tr>'
+                    f'<tr><td style="padding:8px;font-weight:bold">Propiedad</td><td style="padding:8px">{prop.identificador} - {prop.nombre}</td></tr>'
+                    f'<tr><td style="padding:8px;font-weight:bold">Dirección</td><td style="padding:8px">{location}</td></tr>'
+                    f'<tr><td style="padding:8px;font-weight:bold">Fecha</td><td style="padding:8px">{date_str}</td></tr>'
+                    f'<tr><td style="padding:8px;font-weight:bold">Hora</td><td style="padding:8px">{time_str}</td></tr>'
+                    f'</table>'
+                    f'</div>'
+                ),
+            })
+        except Exception as e:
+            logger.error(f"Error sending appointment email to {agent.email}: {e}")
+
     return {
         'success': True,
         'appointment_id': appointment.id,
