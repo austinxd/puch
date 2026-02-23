@@ -193,7 +193,7 @@ Responde en español, de forma estructurada y accionable. Usa markdown para form
         try:
             client = OpenAI(api_key=settings.OPENAI_API_KEY)
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1-mini",
                 messages=[{"role": "user", "content": analysis_prompt}],
                 max_tokens=2500,
                 temperature=0.5,

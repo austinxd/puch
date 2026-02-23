@@ -277,7 +277,7 @@ export default function AnalyticsDashboard() {
           {aiLoading && (
             <div className="flex items-center gap-3 py-8 justify-center">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600" />
-              <span className="text-gray-500">Analizando conversaciones con GPT-4o...</span>
+              <span className="text-gray-500">Analizando conversaciones con IA...</span>
             </div>
           )}
 
