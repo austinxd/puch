@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../../api/client'
 
 interface CalendarEvent {
@@ -22,6 +23,7 @@ interface Appointment {
   datetime_start: string
   datetime_end: string
   status: string
+  conversation_session_id: string | null
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -51,6 +53,7 @@ function groupByDate(events: CalendarEvent[]): Record<string, CalendarEvent[]> {
 }
 
 export default function AppointmentList() {
+  const navigate = useNavigate()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
@@ -162,6 +165,17 @@ export default function AppointmentList() {
                     <p className="text-xs text-gray-400 mt-1">
                       {formatDate(a.datetime_start)} | Agente: {a.agent_name}
                     </p>
+                    {a.conversation_session_id && (
+                      <button
+                        onClick={() => navigate(`/assistant?chat=${a.conversation_session_id}`)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        Ver conversación
+                      </button>
+                    )}
                   </div>
                 </div>
               )

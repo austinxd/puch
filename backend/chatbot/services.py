@@ -163,7 +163,7 @@ CALENDAR_TOOLS = [
         "type": "function",
         "function": {
             "name": "create_appointment",
-            "description": "Crea una cita para visitar una propiedad. Solo usar cuando el cliente haya confirmado fecha, hora y datos de contacto.",
+            "description": "Crea una cita para visitar una propiedad. Solo usar cuando el cliente haya confirmado fecha, hora y nombre.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -177,7 +177,7 @@ CALENDAR_TOOLS = [
                     },
                     "client_phone": {
                         "type": "string",
-                        "description": "Número de teléfono del cliente",
+                        "description": "Número de teléfono del cliente (opcional, se usa el de la conversación si no se proporciona)",
                     },
                     "date": {
                         "type": "string",
@@ -188,7 +188,7 @@ CALENDAR_TOOLS = [
                         "description": "Hora en formato HH:MM",
                     },
                 },
-                "required": ["property_identifier", "client_name", "client_phone", "date", "time"],
+                "required": ["property_identifier", "client_name", "date", "time"],
             },
         },
     },
@@ -272,11 +272,15 @@ def execute_tool(tool_name, arguments, session_id=''):
                 'agent_phone': prop.agent.phone,
             }), []
 
+        client_phone = arguments.get('client_phone', '')
+        if not client_phone and session_id and len(session_id) >= 7 and session_id.isdigit():
+            client_phone = session_id
+
         result = create_appointment(
             agent_id=prop.agent.id,
             property_id=prop_id,
             client_name=arguments.get('client_name', ''),
-            client_phone=arguments.get('client_phone', ''),
+            client_phone=client_phone,
             date_str=arguments.get('date', ''),
             time_str=arguments.get('time', ''),
             session_id=session_id,

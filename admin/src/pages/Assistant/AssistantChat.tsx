@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
 import ChatMessage from '../../components/ChatMessage'
 
@@ -19,6 +20,7 @@ interface Message {
 const POLL_INTERVAL = 5000
 
 export default function AssistantChat() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -61,6 +63,15 @@ export default function AssistantChat() {
   useEffect(() => {
     fetchConversations()
   }, [fetchConversations])
+
+  // Auto-select from ?chat= query param
+  useEffect(() => {
+    const chatParam = searchParams.get('chat')
+    if (chatParam && !selectedId) {
+      selectConversation(chatParam)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh
   useEffect(() => {
