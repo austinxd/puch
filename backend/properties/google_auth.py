@@ -34,12 +34,32 @@ def _build_flow():
 
 class GoogleConnectView(APIView):
     """Redirects to Google OAuth consent screen for an agent."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, agent_id):
+        # Browser redirects can't send auth headers, so accept token via query param
+        user = request.user
+        if not user or not user.is_authenticated:
+            token_key = request.query_params.get('token')
+            if token_key:
+                from rest_framework.authtoken.models import Token
+                try:
+                    token = Token.objects.select_related('user').get(key=token_key)
+                    user = token.user
+                except Token.DoesNotExist:
+                    return Response(
+                        {'error': 'Token inválido'},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+            else:
+                return Response(
+                    {'error': 'No autorizado'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
         # Non-admin can only connect their own calendar
-        if not request.user.is_staff:
-            agent = getattr(request.user, 'agent_profile', None)
+        if not user.is_staff:
+            agent = getattr(user, 'agent_profile', None)
             if not agent or agent.id != agent_id:
                 return Response(
                     {'error': 'No autorizado'},

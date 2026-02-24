@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import Count, Max, Q, Subquery, OuterRef
 from django.utils import timezone
 from openai import OpenAI
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -74,7 +74,7 @@ class ChatView(APIView):
 
 
 class ConversationListView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         # Subquery for first user message preview (avoids N+1)
@@ -125,7 +125,7 @@ class ConversationListView(APIView):
 
 
 class ChatHistoryView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
         try:
@@ -265,7 +265,7 @@ Responde en español, de forma estructurada y accionable."""
 
 
 class AdminReplyView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
         message = request.data.get('message', '').strip()
@@ -299,7 +299,7 @@ class AdminReplyView(APIView):
 
 
 class AdminUnpauseView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
         try:

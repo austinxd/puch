@@ -60,7 +60,8 @@ export default function AgentForm() {
 
   const handleConnectGoogle = () => {
     const apiBase = import.meta.env.VITE_API_URL || '/api'
-    window.location.href = `${apiBase}/google/connect/${id}/`
+    const token = localStorage.getItem('token')
+    window.location.href = `${apiBase}/google/connect/${id}/?token=${token}`
   }
 
   const handleDisconnectGoogle = async () => {

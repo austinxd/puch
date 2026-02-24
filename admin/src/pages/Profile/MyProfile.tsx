@@ -55,7 +55,8 @@ export default function MyProfile() {
   const handleConnectGoogle = () => {
     if (!profile) return
     const apiBase = import.meta.env.VITE_API_URL || '/api'
-    window.location.href = `${apiBase}/google/connect/${profile.id}/?source=profile`
+    const token = localStorage.getItem('token')
+    window.location.href = `${apiBase}/google/connect/${profile.id}/?source=profile&token=${token}`
   }
 
   const handleDisconnectGoogle = async () => {
