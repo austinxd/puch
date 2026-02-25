@@ -137,12 +137,21 @@ def search_properties(current_message, conversation_messages=None):
         if id_matches.exists():
             return id_matches[:10]
 
-    # Step 2: Keyword search on current message, only if substantive (2+ keywords).
-    # Single generic keywords like "piso" can false-match unrelated properties.
+    # Step 2: Keyword search on current message.
+    # With 2+ keywords, always search. With 1 keyword, only search if it matches
+    # a distrito or tipologia (specific fields) to avoid false matches from
+    # generic words like "piso" or "vista".
     if len(current_keywords) >= 2:
         results = _search_by_text(current_message)
         if results.exists():
             return results
+    elif len(current_keywords) == 1:
+        kw = current_keywords[0]
+        single_kw_qs = base_qs.filter(
+            Q(distrito__icontains=kw) | Q(tipologia__icontains=kw)
+        )
+        if single_kw_qs.exists():
+            return single_kw_qs[:10]
 
     # Step 3: Full search on conversation history (maintains context for follow-ups)
     if conversation_messages:
@@ -196,15 +205,14 @@ def format_property(prop):
     ]
     images = list(prop.images.all())
     if images:
-        lines.append(f"  Imágenes disponibles: SÍ ({len(images)} imágenes)")
-        for i, img in enumerate(images, 1):
-            tag_label = f" ({img.tag})" if img.tag else ""
-            lines.append(f"    Imagen {i}{tag_label}: {_get_media_url(img.image)}")
+        tags = set(img.tag for img in images if img.tag)
+        tag_info = f" - Áreas: {', '.join(tags)}" if tags else ""
+        lines.append(f"  Imágenes disponibles: SÍ ({len(images)} fotos{tag_info})")
     else:
         lines.append("  Imágenes disponibles: NO")
     video = prop.videos.first()
     if video:
-        lines.append(f"  Video disponible: SÍ → {_get_media_url(video.video)}")
+        lines.append("  Video disponible: SÍ (usar send_property_media para enviar)")
     else:
         lines.append("  Video disponible: NO")
     if prop.recorrido_360:
@@ -295,6 +303,10 @@ CALENDAR_TOOLS = [
                         "type": "string",
                         "description": "Área específica para filtrar imágenes (ej: sala, cocina, habitacion, bano, fachada, terraza, vista, cochera, lobby, piscina, areas_comunes). Si no se especifica, envía todas.",
                     },
+                    "max_photos": {
+                        "type": "integer",
+                        "description": "Número máximo de fotos a enviar (por defecto 5). Aumentar solo si el cliente solicita más fotos.",
+                    },
                 },
                 "required": ["property_identifier", "media_type"],
             },
@@ -380,10 +392,14 @@ def execute_tool(tool_name, arguments, session_id=''):
 
         media = []
         image_details = []
+        total_images = 0
         if media_type in ('images', 'all'):
             images = prop.images.all()
             if area:
                 images = images.filter(tag__iexact=area)
+            max_photos = arguments.get('max_photos', 5)
+            total_images = images.count()
+            images = images[:max_photos]
             for img in images:
                 url = _get_media_url(img.image)
                 media.append({'type': 'image', 'url': url})
@@ -400,7 +416,11 @@ def execute_tool(tool_name, arguments, session_id=''):
         if not media:
             result_msg = f"La propiedad {prop_id} no tiene {'imágenes' if media_type == 'images' else 'video' if media_type == 'video' else 'medios'}{area_label} disponibles."
         else:
-            result_msg = f"Se enviarán {len(media)} archivos multimedia de la propiedad {prop_id}{area_label}. Detalle de lo enviado:\n" + '\n'.join(image_details)
+            remaining = total_images - len([m for m in media if m['type'] == 'image']) if media_type in ('images', 'all') else 0
+            result_msg = f"Se enviarán {len(media)} archivos multimedia de la propiedad {prop_id}{area_label}."
+            if remaining > 0:
+                result_msg += f" Hay {remaining} fotos adicionales disponibles si el cliente desea verlas."
+            result_msg += "\nDetalle de lo enviado:\n" + '\n'.join(image_details)
         return json.dumps({'message': result_msg, 'media_count': len(media)}), media
 
     return json.dumps({'error': f'Función desconocida: {tool_name}'}), []
@@ -527,12 +547,25 @@ def get_chat_response(conversation, user_message):
     system_prompt = get_system_prompt().replace('{current_date}', date.today().strftime('%Y-%m-%d (%A)'))
 
     media_instructions = (
-        "\n\n=== INSTRUCCIONES DE MEDIA ==="
-        "\nCuando envíes fotos o videos usando el tool send_property_media, confía en el resultado del tool."
-        " El detalle te indica exactamente qué imágenes se enviaron y de qué área son (fachada, sala, cocina, etc.)."
-        " NUNCA te disculpes ni digas que cometiste un error si el envío fue exitoso."
-        " Si el cliente pregunta de qué es una foto, responde con seguridad usando el tag de la imagen."
-        " NUNCA mezcles información de una propiedad con otra. Cada propiedad tiene su propio identificador."
+        "\n\n=== INSTRUCCIONES IMPORTANTES ==="
+        "\n\nORDEN DE ENVÍO DE MEDIA:"
+        "\n1. Al presentar una propiedad, envía PRIMERO el VIDEO (send_property_media con media_type='video')."
+        "\n2. Luego comparte el enlace del RECORRIDO 360 si existe (menciónalo en tu texto)."
+        "\n3. Las FOTOS solo se envían si el cliente las pide. NO envíes fotos automáticamente."
+        "\n4. Al enviar fotos, se envían máximo 5. Si el cliente quiere más, usa max_photos con un número mayor."
+        "\n\nREGLAS DE MEDIA:"
+        "\n- NUNCA escribas URLs de imágenes ni videos como texto en tu respuesta. SIEMPRE usa el tool send_property_media."
+        "\n- Confía en el resultado del tool. Si reporta éxito, responde con seguridad. NUNCA te disculpes si fue exitoso."
+        "\n- Si el cliente pregunta de qué es una foto, responde con seguridad usando el tag de la imagen."
+        "\n- NUNCA mezcles información de una propiedad con otra."
+        "\n\nINFORMACIÓN DE PROPIEDADES:"
+        "\n- Si la información de una propiedad aparece en el contexto de arriba, ÚSALA. Tienes toda la info disponible."
+        "\n- NUNCA digas 'no tengo esa información' o 'no cuento con esos datos' si la info está en el contexto de propiedades."
+        "\n- Solo di que no tienes info si realmente NO aparece en el contexto."
+        "\n\nMEMORIA Y PERSONALIZACIÓN:"
+        "\n- RECUERDA el nombre del cliente y úsalo para dirigirte a él/ella durante toda la conversación."
+        "\n- Recuerda las propiedades discutidas, preferencias mencionadas y todo lo hablado anteriormente."
+        "\n- Presta atención a cada dato que el cliente comparte (nombre, teléfono, preferencias) y úsalo."
     )
 
     messages = [
