@@ -9,6 +9,7 @@ interface Conversation {
   message_count: number
   last_message_at: string
   preview: string
+  agent_name: string | null
 }
 
 interface Message {
