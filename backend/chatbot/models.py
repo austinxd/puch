@@ -5,6 +5,12 @@ from django.utils import timezone
 
 class ChatConversation(models.Model):
     session_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
+    agent = models.ForeignKey(
+        'properties.Agent',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='conversations',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     admin_paused_until = models.DateTimeField(null=True, blank=True)
 

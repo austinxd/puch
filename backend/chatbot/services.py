@@ -101,6 +101,16 @@ def _search_by_text(text):
     return properties
 
 
+def assign_conversation_agent(conversation, first_message):
+    """Assign the conversation to the agent of the first property mentioned."""
+    results = _search_by_text(first_message)
+    if results.exists():
+        prop = results.first()
+        if prop.agent:
+            conversation.agent = prop.agent
+            conversation.save(update_fields=['agent'])
+
+
 def search_properties(current_message, conversation_messages=None):
     """Hybrid property search: try current message first, fall back to full history.
 

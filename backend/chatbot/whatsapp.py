@@ -7,7 +7,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import ChatConversation, ChatMessage
-from .services import get_chat_response
+from .services import get_chat_response, assign_conversation_agent
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +115,11 @@ class WhatsAppWebhookView(View):
 
                     # Use phone number as session_id (consistent per user)
                     session_id = phone
-                    conversation, _ = ChatConversation.objects.get_or_create(
+                    conversation, created = ChatConversation.objects.get_or_create(
                         session_id=session_id,
                     )
+                    if created:
+                        assign_conversation_agent(conversation, text)
 
                     # Save user message
                     ChatMessage.objects.create(

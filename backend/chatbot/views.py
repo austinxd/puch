@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from .models import ChatConversation, ChatMessage, SystemPrompt
-from .services import get_chat_response
+from .services import get_chat_response, assign_conversation_agent
 from .whatsapp import send_whatsapp_message
 from properties.permissions import IsAdmin
 
@@ -34,7 +34,9 @@ class ChatView(APIView):
         if not session_id:
             session_id = str(uuid.uuid4())
 
-        conversation, _ = ChatConversation.objects.get_or_create(session_id=session_id)
+        conversation, created = ChatConversation.objects.get_or_create(session_id=session_id)
+        if created:
+            assign_conversation_agent(conversation, message)
 
         ChatMessage.objects.create(
             conversation=conversation,
@@ -94,6 +96,14 @@ class ConversationListView(APIView):
             )
             .filter(message_count__gt=0)
         )
+
+        # Non-admin users only see conversations assigned to their agent
+        if not request.user.is_staff:
+            agent = getattr(request.user, 'agent_profile', None)
+            if agent:
+                conversations = conversations.filter(agent=agent)
+            else:
+                return Response({'results': []})
 
         search = request.query_params.get('search', '').strip()
         if search:
