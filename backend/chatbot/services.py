@@ -494,7 +494,7 @@ def get_chat_response(conversation, user_message):
             'media': [],
         }
 
-    history = conversation.messages.order_by('-created_at')[:30]
+    history = conversation.messages.order_by('-created_at')[:100]
     history = list(reversed(history))
 
     # Build conversation context for property search fallback (all user messages)
