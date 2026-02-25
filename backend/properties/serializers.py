@@ -6,13 +6,16 @@ User = get_user_model()
 
 
 class AgentSerializer(serializers.ModelSerializer):
-    google_calendar_connected = serializers.BooleanField(read_only=True)
+    google_calendar_connected = serializers.SerializerMethodField()
     username = serializers.CharField(write_only=True, required=False)
     password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Agent
-        fields = ['id', 'name', 'phone', 'email', 'google_calendar_connected', 'username', 'password']
+        fields = ['id', 'name', 'phone', 'email', 'google_calendar_id', 'google_calendar_connected', 'username', 'password']
+
+    def get_google_calendar_connected(self, obj):
+        return bool(obj.google_calendar_id)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
