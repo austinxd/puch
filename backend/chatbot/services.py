@@ -104,19 +104,37 @@ def _search_by_text(text):
 def search_properties(current_message, conversation_messages=None):
     """Hybrid property search: try current message first, fall back to full history.
 
-    This prevents old messages from dominating results when the user changes topic.
+    Strategy:
+    1. Identifier match on current message (always, even with 1 keyword)
+    2. Keyword search on current message (only with 2+ keywords to avoid
+       generic follow-ups like "que piso" matching unrelated properties)
+    3. Full search on conversation history (for follow-up questions)
 
     Args:
         current_message: the latest user message string.
         conversation_messages: optional list of message dicts with 'role' and 'content' keys
                               (full conversation history for fallback).
     """
-    # Try searching with the current message only
-    results = _search_by_text(current_message)
-    if results.exists():
-        return results
+    current_keywords = _extract_keywords(current_message)
+    base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
 
-    # Fallback: search with full conversation history
+    # Step 1: Identifier match on current message (always check)
+    if current_keywords:
+        id_filter = Q()
+        for kw in current_keywords:
+            id_filter |= Q(identificador__iexact=kw)
+        id_matches = base_qs.filter(id_filter)
+        if id_matches.exists():
+            return id_matches[:10]
+
+    # Step 2: Keyword search on current message, only if substantive (2+ keywords).
+    # Single generic keywords like "piso" can false-match unrelated properties.
+    if len(current_keywords) >= 2:
+        results = _search_by_text(current_message)
+        if results.exists():
+            return results
+
+    # Step 3: Full search on conversation history (maintains context for follow-ups)
     if conversation_messages:
         combined_text = ' '.join(
             msg['content'] for msg in conversation_messages
