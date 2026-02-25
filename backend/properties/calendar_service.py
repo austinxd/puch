@@ -25,13 +25,18 @@ def get_google_credentials(agent):
     if not agent.google_access_token:
         return None
 
+    # google-auth expects a naive UTC datetime for expiry
+    expiry = agent.google_token_expiry
+    if expiry and expiry.tzinfo is not None:
+        expiry = expiry.replace(tzinfo=None)
+
     creds = Credentials(
         token=agent.google_access_token,
         refresh_token=agent.google_refresh_token,
         token_uri='https://oauth2.googleapis.com/token',
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
-        expiry=agent.google_token_expiry,
+        expiry=expiry,
     )
 
     # Refresh if expired, or if expiry was never set (token may be stale)
