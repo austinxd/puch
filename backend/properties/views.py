@@ -67,12 +67,11 @@ class CalendarEventsView(APIView):
         date_to = request.query_params.get('to', (date.today() + timedelta(days=30)).strftime('%Y-%m-%d'))
 
         if request.user.is_staff:
-            agents = Agent.objects.filter(google_calendar_connected=True)
+            agents = Agent.objects.exclude(google_calendar_id='')
         else:
             agents = Agent.objects.filter(
                 id=request.user.agent_profile.id,
-                google_calendar_connected=True,
-            )
+            ).exclude(google_calendar_id='')
 
         all_events = []
         for agent in agents:
