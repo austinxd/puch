@@ -13,7 +13,12 @@ class Agent(models.Model):
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=50, blank=True, default='')
     email = models.EmailField(blank=True, default='')
-    # Google Calendar OAuth
+    # Google Calendar (Service Account)
+    google_calendar_id = models.EmailField(
+        blank=True, default='',
+        help_text='Gmail del agente (se usa como Calendar ID)',
+    )
+    # Legacy OAuth fields (unused, kept for migration compatibility)
     google_access_token = models.TextField(blank=True, default='')
     google_refresh_token = models.TextField(blank=True, default='')
     google_token_expiry = models.DateTimeField(null=True, blank=True)
