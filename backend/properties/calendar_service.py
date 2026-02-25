@@ -31,9 +31,12 @@ def get_google_credentials(agent):
         token_uri='https://oauth2.googleapis.com/token',
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
+        expiry=agent.google_token_expiry,
     )
 
-    if creds.expired and creds.refresh_token:
+    # Refresh if expired, or if expiry was never set (token may be stale)
+    needs_refresh = creds.expired or (creds.expiry is None and creds.refresh_token)
+    if needs_refresh and creds.refresh_token:
         try:
             creds.refresh(Request())
             agent.google_access_token = creds.token
