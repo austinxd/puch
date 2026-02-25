@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
 
 interface ProfileData {
@@ -6,31 +7,37 @@ interface ProfileData {
   name: string
   phone: string
   email: string
-  google_calendar_id: string
   google_calendar_connected: boolean
 }
 
 export default function MyProfile() {
+  const [searchParams] = useSearchParams()
   const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [form, setForm] = useState({ name: '', phone: '', email: '', google_calendar_id: '' })
+  const [form, setForm] = useState({ name: '', phone: '', email: '' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [googleStatus, setGoogleStatus] = useState<string | null>(null)
 
   const fetchProfile = () => {
     api.get('/auth/profile/').then((res) => {
       setProfile(res.data)
-      setForm({
-        name: res.data.name,
-        phone: res.data.phone,
-        email: res.data.email,
-        google_calendar_id: res.data.google_calendar_id || '',
-      })
+      setForm({ name: res.data.name, phone: res.data.phone, email: res.data.email })
     })
   }
 
   useEffect(() => {
     fetchProfile()
   }, [])
+
+  useEffect(() => {
+    const googleParam = searchParams.get('google')
+    if (googleParam === 'connected') {
+      setGoogleStatus('connected')
+      fetchProfile()
+    } else if (googleParam === 'error') {
+      setGoogleStatus('error')
+    }
+  }, [searchParams])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -43,7 +50,21 @@ export default function MyProfile() {
     await api.patch('/auth/profile/', form)
     setSaving(false)
     setSaved(true)
-    fetchProfile()
+  }
+
+  const handleConnectGoogle = () => {
+    if (!profile) return
+    const apiBase = import.meta.env.VITE_API_URL || '/api'
+    const token = localStorage.getItem('token')
+    window.location.href = `${apiBase}/google/connect/${profile.id}/?source=profile&token=${token}`
+  }
+
+  const handleDisconnectGoogle = async () => {
+    if (!profile) return
+    if (!confirm('¿Desconectar Google Calendar?')) return
+    await api.post(`/agents/${profile.id}/disconnect-google/`)
+    setProfile({ ...profile, google_calendar_connected: false })
+    setGoogleStatus(null)
   }
 
   if (!profile) {
@@ -74,42 +95,6 @@ export default function MyProfile() {
           <input name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} />
         </div>
 
-        {/* Google Calendar */}
-        <div className="border border-gray-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Google Calendar</h3>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tu Gmail
-            </label>
-            <input
-              name="google_calendar_id"
-              type="email"
-              value={form.google_calendar_id}
-              onChange={handleChange}
-              placeholder="tu-correo@gmail.com"
-              className={inputClass}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Debes compartir tu Google Calendar con la cuenta de servicio de Brikia.
-            </p>
-          </div>
-          {form.google_calendar_id ? (
-            <div className="mt-3">
-              <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Configurado
-              </span>
-            </div>
-          ) : (
-            <div className="mt-3">
-              <span className="inline-flex items-center gap-1.5 text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
-                No configurado
-              </span>
-            </div>
-          )}
-        </div>
-
         <div className="flex items-center gap-4 pt-2">
           <button
             type="submit"
@@ -123,6 +108,52 @@ export default function MyProfile() {
           )}
         </div>
       </form>
+
+      {/* Google Calendar */}
+      <div className="border border-gray-200 rounded-lg p-4 mt-8 max-w-lg">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">Google Calendar</h3>
+
+        {googleStatus === 'connected' && (
+          <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-3 py-2 mb-3">
+            Google Calendar conectado exitosamente
+          </div>
+        )}
+        {googleStatus === 'error' && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3">
+            Error al conectar Google Calendar. Intenta de nuevo.
+          </div>
+        )}
+
+        {profile.google_calendar_connected ? (
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              Conectado
+            </span>
+            <button
+              type="button"
+              onClick={handleDisconnectGoogle}
+              className="text-red-600 hover:text-red-800 text-sm underline"
+            >
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+              <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+              No conectado
+            </span>
+            <button
+              type="button"
+              onClick={handleConnectGoogle}
+              className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            >
+              Conectar Google Calendar
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

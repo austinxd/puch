@@ -61,8 +61,7 @@ class MyProfileView(APIView):
             'name': agent.name,
             'phone': agent.phone,
             'email': agent.email,
-            'google_calendar_id': agent.google_calendar_id,
-            'google_calendar_connected': bool(agent.google_calendar_id),
+            'google_calendar_connected': agent.google_calendar_connected,
         })
 
     def patch(self, request):
@@ -73,7 +72,7 @@ class MyProfileView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        for field in ('name', 'phone', 'email', 'google_calendar_id'):
+        for field in ('name', 'phone', 'email'):
             value = request.data.get(field)
             if value is not None:
                 setattr(agent, field, value)
@@ -84,8 +83,7 @@ class MyProfileView(APIView):
             'name': agent.name,
             'phone': agent.phone,
             'email': agent.email,
-            'google_calendar_id': agent.google_calendar_id,
-            'google_calendar_connected': bool(agent.google_calendar_id),
+            'google_calendar_connected': agent.google_calendar_connected,
         })
 
 

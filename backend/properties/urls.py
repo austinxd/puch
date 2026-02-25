@@ -6,6 +6,7 @@ from .views import (
     PropertyImageView, PropertyImageDetailView, ImageTagsView,
     PropertyVideoView, PropertyVideoDetailView,
 )
+from .google_auth import GoogleConnectView, GoogleCallbackView, DisconnectGoogleView
 from .auth_views import LoginView, LogoutView, MeView, MyProfileView
 
 router = DefaultRouter()
@@ -28,4 +29,8 @@ urlpatterns = [
     path('', include(router.urls)),
     # Calendar events
     path('calendar/events/', CalendarEventsView.as_view(), name='calendar-events'),
+    # Google Calendar OAuth
+    path('google/connect/<int:agent_id>/', GoogleConnectView.as_view(), name='google-connect'),
+    path('google/callback/', GoogleCallbackView.as_view(), name='google-callback'),
+    path('agents/<int:agent_id>/disconnect-google/', DisconnectGoogleView.as_view(), name='google-disconnect'),
 ]

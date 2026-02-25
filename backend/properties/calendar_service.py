@@ -3,7 +3,9 @@ from datetime import datetime, timedelta, time as dt_time
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
-from google.oauth2 import service_account
+from django.utils import timezone
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 from .models import Agent, Appointment, Property
@@ -17,22 +19,49 @@ BUSINESS_END_HOUR = 18
 BUSINESS_DAYS = {0, 1, 2, 3, 4, 5}  # Lunes a Sábado
 SLOT_DURATION_MINUTES = 60
 
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+
+def get_google_credentials(agent):
+    """Build Google Credentials for an agent, refreshing the token if expired."""
+    if not agent.google_access_token:
+        return None
+
+    # google-auth expects a naive UTC datetime for expiry
+    expiry = agent.google_token_expiry
+    if expiry and expiry.tzinfo is not None:
+        expiry = expiry.replace(tzinfo=None)
+
+    creds = Credentials(
+        token=agent.google_access_token,
+        refresh_token=agent.google_refresh_token,
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        expiry=expiry,
+    )
+
+    # Refresh if expired, or if expiry was never set (token may be stale)
+    needs_refresh = creds.expired or (creds.expiry is None and creds.refresh_token)
+    if needs_refresh and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            agent.google_access_token = creds.token
+            agent.google_token_expiry = creds.expiry
+            agent.save(update_fields=['google_access_token', 'google_token_expiry'])
+        except Exception as e:
+            logger.error(f"Error refreshing token for agent {agent.id}: {e}")
+            agent.google_calendar_connected = False
+            agent.save(update_fields=['google_calendar_connected'])
+            return None
+
+    return creds
 
 
-def _get_calendar_service():
-    """Get a Google Calendar API service using the service account."""
-    sa_file = getattr(settings, 'GOOGLE_SERVICE_ACCOUNT_FILE', '')
-    if not sa_file:
+def _get_calendar_service(agent):
+    """Get a Google Calendar API service for the given agent."""
+    creds = get_google_credentials(agent)
+    if not creds:
         return None
-    try:
-        creds = service_account.Credentials.from_service_account_file(
-            sa_file, scopes=SCOPES,
-        )
-        return build('calendar', 'v3', credentials=creds)
-    except Exception as e:
-        logger.error(f"Error building calendar service: {e}")
-        return None
+    return build('calendar', 'v3', credentials=creds)
 
 
 def check_availability(agent_id, date_str, time_str=None):
@@ -52,10 +81,10 @@ def check_availability(agent_id, date_str, time_str=None):
     except Agent.DoesNotExist:
         return {'error': 'Agente no encontrado'}
 
-    if not agent.google_calendar_id:
-        return {'error': 'El agente no tiene Google Calendar configurado'}
+    if not agent.google_calendar_connected:
+        return {'error': 'El agente no tiene Google Calendar conectado'}
 
-    service = _get_calendar_service()
+    service = _get_calendar_service(agent)
     if not service:
         return {'error': 'No se pudo conectar con Google Calendar'}
 
@@ -78,12 +107,11 @@ def check_availability(agent_id, date_str, time_str=None):
     day_end = datetime.combine(target_date, dt_time(hour=BUSINESS_END_HOUR), tzinfo=tz)
 
     # Query Google Calendar freebusy
-    calendar_id = agent.google_calendar_id
     body = {
         'timeMin': day_start.isoformat(),
         'timeMax': day_end.isoformat(),
         'timeZone': TIMEZONE,
-        'items': [{'id': calendar_id}],
+        'items': [{'id': 'primary'}],
     }
 
     try:
@@ -92,7 +120,7 @@ def check_availability(agent_id, date_str, time_str=None):
         logger.error(f"Error querying freebusy for agent {agent_id}: {e}")
         return {'error': 'Error al consultar disponibilidad en Google Calendar'}
 
-    busy_periods = result.get('calendars', {}).get(calendar_id, {}).get('busy', [])
+    busy_periods = result.get('calendars', {}).get('primary', {}).get('busy', [])
 
     # Parse busy periods
     busy_slots = []
@@ -165,10 +193,10 @@ def get_calendar_events(agent_id, date_from, date_to):
     except Agent.DoesNotExist:
         return {'error': 'Agente no encontrado'}
 
-    if not agent.google_calendar_id:
-        return {'error': 'El agente no tiene Google Calendar configurado'}
+    if not agent.google_calendar_connected:
+        return {'error': 'El agente no tiene Google Calendar conectado'}
 
-    service = _get_calendar_service()
+    service = _get_calendar_service(agent)
     if not service:
         return {'error': 'No se pudo conectar con Google Calendar'}
 
@@ -184,7 +212,7 @@ def get_calendar_events(agent_id, date_from, date_to):
 
     try:
         result = service.events().list(
-            calendarId=agent.google_calendar_id,
+            calendarId='primary',
             timeMin=time_min.isoformat(),
             timeMax=time_max.isoformat(),
             singleEvents=True,
@@ -234,8 +262,8 @@ def create_appointment(agent_id, property_id, client_name, client_phone, date_st
     except Agent.DoesNotExist:
         return {'error': 'Agente no encontrado'}
 
-    if not agent.google_calendar_id:
-        return {'error': 'El agente no tiene Google Calendar configurado'}
+    if not agent.google_calendar_connected:
+        return {'error': 'El agente no tiene Google Calendar conectado'}
 
     # Find property by ID or identificador
     try:
@@ -256,7 +284,7 @@ def create_appointment(agent_id, property_id, client_name, client_phone, date_st
             'available_slots': availability.get('available_slots', []),
         }
 
-    service = _get_calendar_service()
+    service = _get_calendar_service(agent)
     if not service:
         return {'error': 'No se pudo conectar con Google Calendar'}
 
@@ -298,9 +326,7 @@ def create_appointment(agent_id, property_id, client_name, client_phone, date_st
     }
 
     try:
-        created_event = service.events().insert(
-            calendarId=agent.google_calendar_id, body=event,
-        ).execute()
+        created_event = service.events().insert(calendarId='primary', body=event).execute()
     except Exception as e:
         logger.error(f"Error creating Google Calendar event for agent {agent_id}: {e}")
         return {'error': 'Error al crear el evento en Google Calendar'}

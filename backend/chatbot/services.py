@@ -318,7 +318,7 @@ CALENDAR_TOOLS = [
 def _has_calendar_agents(properties):
     """Check if any property in the list has an agent with Google Calendar connected."""
     for prop in properties:
-        if prop.agent and prop.agent.google_calendar_id:
+        if prop.agent and prop.agent.google_calendar_connected:
             return True
     return False
 
@@ -335,7 +335,7 @@ def execute_tool(tool_name, arguments, session_id=''):
         if not prop.agent:
             return json.dumps({'error': f'La propiedad {prop_id} no tiene agente asignado'}), []
 
-        if not prop.agent.google_calendar_id:
+        if not prop.agent.google_calendar_connected:
             return json.dumps({
                 'error': 'calendar_not_connected',
                 'agent_name': prop.agent.name,
@@ -359,7 +359,7 @@ def execute_tool(tool_name, arguments, session_id=''):
         if not prop.agent:
             return json.dumps({'error': f'La propiedad {prop_id} no tiene agente asignado'}), []
 
-        if not prop.agent.google_calendar_id:
+        if not prop.agent.google_calendar_connected:
             return json.dumps({
                 'error': 'calendar_not_connected',
                 'agent_name': prop.agent.name,
