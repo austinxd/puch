@@ -89,6 +89,7 @@ class ConversationListView(APIView):
 
         conversations = (
             ChatConversation.objects
+            .select_related('agent')
             .annotate(
                 message_count=Count('messages', distinct=True),
                 last_message_at=Max('messages__created_at'),
@@ -129,6 +130,7 @@ class ConversationListView(APIView):
                 'message_count': conv.message_count,
                 'last_message_at': conv.last_message_at,
                 'preview': preview,
+                'agent_name': conv.agent.name if conv.agent else None,
             })
 
         return Response({'results': results})

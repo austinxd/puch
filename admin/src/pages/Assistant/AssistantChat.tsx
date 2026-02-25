@@ -235,9 +235,16 @@ export default function AssistantChat() {
                     <span className="text-xs text-gray-500">
                       {formatDate(conv.last_message_at)}
                     </span>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                      {conv.message_count} msgs
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {conv.agent_name && (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full truncate max-w-[100px]">
+                          {conv.agent_name}
+                        </span>
+                      )}
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                        {conv.message_count} msgs
+                      </span>
+                    </div>
                   </div>
                 </button>
               ))
