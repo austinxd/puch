@@ -224,11 +224,20 @@ export default function AssistantChat() {
                     selectedId === conv.session_id ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : ''
                   }`}
                 >
-                  {isPhone(conv.session_id) && (
-                    <p className="text-xs text-green-600 font-medium mb-1">
-                      +{conv.session_id}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      {isPhone(conv.session_id) && (
+                        <span className="text-xs text-green-600 font-medium">
+                          +{conv.session_id}
+                        </span>
+                      )}
+                    </div>
+                    {conv.agent_name && (
+                      <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                        {conv.agent_name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-900 font-medium truncate">
                     {conv.preview || 'Sin mensaje'}
                   </p>
@@ -236,16 +245,9 @@ export default function AssistantChat() {
                     <span className="text-xs text-gray-500">
                       {formatDate(conv.last_message_at)}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      {conv.agent_name && (
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full truncate max-w-[100px]">
-                          {conv.agent_name}
-                        </span>
-                      )}
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                        {conv.message_count} msgs
-                      </span>
-                    </div>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                      {conv.message_count} msgs
+                    </span>
                   </div>
                 </button>
               ))
