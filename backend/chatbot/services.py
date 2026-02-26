@@ -612,7 +612,12 @@ def get_chat_response(conversation, user_message):
 
             logger.info(f"Tool call: {func_name}({func_args})")
             result, media = execute_tool(func_name, func_args, session_id=conversation.session_id)
-            all_media.extend(media)
+            # Deduplicate: only add media URLs not already in the list
+            existing_urls = {m['url'] for m in all_media}
+            for item in media:
+                if item['url'] not in existing_urls:
+                    all_media.append(item)
+                    existing_urls.add(item['url'])
             logger.info(f"Tool result: {result}")
 
             messages.append({
