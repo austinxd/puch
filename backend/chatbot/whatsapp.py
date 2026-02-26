@@ -1,7 +1,10 @@
 import json
 import logging
+import threading
+import time
 import requests
 from django.conf import settings
+from django.db import close_old_connections
 from django.http import HttpResponse, JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -12,6 +15,13 @@ from .services import get_chat_response, assign_conversation_agent
 logger = logging.getLogger(__name__)
 
 WHATSAPP_API_URL = "https://graph.facebook.com/v21.0"
+
+# Debounce: wait for rapid messages before processing
+DEBOUNCE_SECONDS = 4
+
+# Track active processing sessions within this worker to prevent duplicates
+_active_sessions = set()
+_sessions_lock = threading.Lock()
 
 
 def send_whatsapp_message(to, text):
@@ -77,6 +87,93 @@ def send_whatsapp_video(to, video_url, caption=''):
     return response
 
 
+def _process_pending(session_id, phone):
+    """Find and process all pending user messages for a conversation."""
+    conversation = ChatConversation.objects.get(session_id=session_id)
+
+    if conversation.is_ai_paused:
+        return False
+
+    # Find the last bot/admin response
+    last_response = conversation.messages.filter(
+        role__in=['assistant', 'admin']
+    ).order_by('-created_at').first()
+
+    # Get pending user messages (after last response)
+    if last_response:
+        pending = conversation.messages.filter(
+            role='user',
+            created_at__gt=last_response.created_at,
+        ).order_by('created_at')
+    else:
+        pending = conversation.messages.filter(role='user').order_by('created_at')
+
+    if not pending.exists():
+        return False
+
+    # Use the last pending message as the "current" message.
+    # get_chat_response loads the full history from DB, so the AI
+    # sees ALL pending messages in sequence and generates one unified reply.
+    last_msg = pending.last()
+
+    response = get_chat_response(conversation, last_msg.content)
+    reply = response['text']
+    media = response['media']
+
+    # Double-check: has another worker already responded while we were processing?
+    new_last = conversation.messages.filter(
+        role__in=['assistant', 'admin']
+    ).order_by('-created_at').first()
+    if last_response and new_last and new_last.pk != last_response.pk:
+        return False
+    if not last_response and new_last:
+        return False
+
+    # Save assistant message
+    saved_content = reply
+    if media:
+        media_lines = '\n'.join(
+            f'[media:{item["type"]}]{item["url"]}[/media]' for item in media
+        )
+        saved_content = f"{reply}\n{media_lines}"
+    ChatMessage.objects.create(
+        conversation=conversation,
+        role=ChatMessage.Role.ASSISTANT,
+        content=saved_content,
+    )
+
+    # Send via WhatsApp
+    send_whatsapp_message(phone, reply)
+    for item in media:
+        if item['type'] == 'image':
+            send_whatsapp_image(phone, item['url'])
+        elif item['type'] == 'video':
+            send_whatsapp_video(phone, item['url'])
+
+    return True
+
+
+def _process_messages_async(session_id, phone):
+    """Background thread: wait for rapid messages to accumulate, then process."""
+    try:
+        # Wait for more messages to arrive
+        time.sleep(DEBOUNCE_SECONDS)
+
+        # Process all accumulated messages as one
+        _process_pending(session_id, phone)
+
+        # Brief wait then check for messages that arrived during processing
+        time.sleep(2)
+        _process_pending(session_id, phone)
+
+    except Exception as e:
+        logger.error(f"Error processing messages for {session_id}: {e}")
+    finally:
+        with _sessions_lock:
+            _active_sessions.discard(session_id)
+        close_old_connections()
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class WhatsAppWebhookView(View):
 
@@ -121,42 +218,30 @@ class WhatsAppWebhookView(View):
                     if created:
                         assign_conversation_agent(conversation, text)
 
-                    # Save user message
+                    # Save user message immediately
                     ChatMessage.objects.create(
                         conversation=conversation,
                         role=ChatMessage.Role.USER,
                         content=text,
                     )
 
-                    # If AI is paused by admin, save message but skip AI response
+                    # Skip AI if paused by admin
                     if conversation.is_ai_paused:
                         logger.info(f"AI paused for {phone}, skipping response")
                         continue
 
-                    # Get AI response (now returns dict with text and media)
-                    response = get_chat_response(conversation, text)
-                    reply = response['text']
-                    media = response['media']
+                    # Debounce: only start processing if no thread is already
+                    # waiting/processing for this session
+                    with _sessions_lock:
+                        if session_id in _active_sessions:
+                            logger.info(f"Debounce: {phone} already active, message queued")
+                            continue
+                        _active_sessions.add(session_id)
 
-                    # Save assistant message (include media URLs for admin visibility)
-                    saved_content = reply
-                    if media:
-                        media_lines = '\n'.join(f'[media:{item["type"]}]{item["url"]}[/media]' for item in media)
-                        saved_content = f"{reply}\n{media_lines}"
-                    ChatMessage.objects.create(
-                        conversation=conversation,
-                        role=ChatMessage.Role.ASSISTANT,
-                        content=saved_content,
-                    )
-
-                    # Send text reply via WhatsApp
-                    send_whatsapp_message(phone, reply)
-
-                    # Send media natively
-                    for item in media:
-                        if item['type'] == 'image':
-                            send_whatsapp_image(phone, item['url'])
-                        elif item['type'] == 'video':
-                            send_whatsapp_video(phone, item['url'])
+                    threading.Thread(
+                        target=_process_messages_async,
+                        args=(session_id, phone),
+                        daemon=True,
+                    ).start()
 
         return JsonResponse({'status': 'ok'})
