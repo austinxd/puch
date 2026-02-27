@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from .models import ChatConversation, ChatMessage, SystemPrompt
-from .services import get_chat_response, assign_conversation_agent
+from .services import get_chat_response, assign_conversation_agent, search_properties, _extract_keywords, _find_conversation_property
 from .whatsapp import send_whatsapp_message
 from properties.permissions import IsAdmin
 
@@ -324,3 +324,74 @@ class AdminUnpauseView(APIView):
 
         conversation.unpause_ai()
         return Response({'status': 'unpaused'})
+
+
+class ChatDebugView(APIView):
+    """Debug endpoint: shows what the bot sees for a conversation."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, session_id):
+        from properties.models import Property
+
+        try:
+            conversation = ChatConversation.objects.get(session_id=session_id)
+        except ChatConversation.DoesNotExist:
+            return Response(
+                {'error': 'Conversación no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Load history like get_chat_response does
+        history = conversation.messages.order_by('-created_at')[:100]
+        history = list(reversed(history))
+
+        conversation_msgs = [
+            {'role': msg.role, 'content': msg.content}
+            for msg in history
+        ]
+
+        # Get the last user message
+        last_user_msg = ''
+        for msg in reversed(history):
+            if msg.role == 'user':
+                last_user_msg = msg.content
+                break
+
+        # Debug: show keyword extraction
+        keywords = _extract_keywords(last_user_msg)
+
+        # Debug: show active property from history
+        base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
+        active_prop = _find_conversation_property(conversation_msgs, base_qs)
+
+        # Debug: show search results
+        properties = search_properties(last_user_msg, conversation_messages=conversation_msgs)
+        prop_list = [
+            {
+                'identificador': p.identificador,
+                'nombre': p.nombre,
+                'agent': p.agent.name if p.agent else None,
+            }
+            for p in properties
+        ]
+
+        # Recent messages
+        recent_msgs = [
+            {
+                'role': msg.role,
+                'content': msg.content[:200],
+                'created_at': msg.created_at.isoformat(),
+            }
+            for msg in history[-10:]
+        ]
+
+        return Response({
+            'session_id': session_id,
+            'last_user_message': last_user_msg,
+            'extracted_keywords': keywords,
+            'active_property': active_prop.identificador if active_prop else None,
+            'search_results': prop_list,
+            'total_messages': len(history),
+            'recent_messages': recent_msgs,
+            'agent_assigned': conversation.agent.name if conversation.agent else None,
+        })

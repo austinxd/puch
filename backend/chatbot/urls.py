@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     ChatView, ConversationListView, ChatHistoryView, SystemPromptView,
-    PromptAnalysisView, AdminReplyView, AdminUnpauseView,
+    PromptAnalysisView, AdminReplyView, AdminUnpauseView, ChatDebugView,
 )
 from .whatsapp import WhatsAppWebhookView
 from .analytics import AnalyticsView, IntentListView, DealAnalysisView
@@ -12,6 +12,7 @@ urlpatterns = [
     path('chat/<str:session_id>/', ChatHistoryView.as_view(), name='chat-history'),
     path('chat/<str:session_id>/reply/', AdminReplyView.as_view(), name='admin-reply'),
     path('chat/<str:session_id>/unpause/', AdminUnpauseView.as_view(), name='admin-unpause'),
+    path('chat/<str:session_id>/debug/', ChatDebugView.as_view(), name='chat-debug'),
     path('whatsapp/webhook/', WhatsAppWebhookView.as_view(), name='whatsapp-webhook'),
     path('analytics/', AnalyticsView.as_view(), name='analytics'),
     path('intents/', IntentListView.as_view(), name='intent-list'),

@@ -35,6 +35,12 @@ SEARCH_STOPWORDS = {
     'sábado', 'domingo', 'porfavor', 'por', 'quiero', 'quisiera',
     'recorrido', 'enviar', 'mandar', 'dame', 'dime', 'puedo',
     'otra', 'otro', 'más', 'también', 'tambien', 'todas', 'todos',
+    # Common follow-up verbs that cause false positive matches
+    'pasa', 'pasar', 'paso', 'cuenta', 'contar', 'manda', 'mande',
+    'buenas', 'buenos', 'buena', 'bueno', 'noches', 'noche', 'tardes',
+    'tarde', 'dias', 'nombre', 'llamo', 'llama', 'soy',
+    'ubicacion', 'ubicación', 'direccion', 'dirección',
+    'puede', 'podria', 'podría', 'seria', 'sería', 'gustaria', 'gustaría',
 }
 
 
@@ -111,22 +117,43 @@ def assign_conversation_agent(conversation, first_message):
             conversation.save(update_fields=['agent'])
 
 
+def _find_conversation_property(conversation_messages, base_qs):
+    """Find the main property being discussed from conversation history identifiers."""
+    if not conversation_messages:
+        return None
+    # Collect all keywords from user messages
+    all_keywords = []
+    for msg in conversation_messages:
+        if msg.get('role') == 'user':
+            all_keywords.extend(_extract_keywords(msg['content']))
+    if not all_keywords:
+        return None
+    # Single query: check if any keyword matches a property identifier
+    id_filter = Q()
+    for kw in set(all_keywords):
+        id_filter |= Q(identificador__iexact=kw)
+    matches = list(base_qs.filter(id_filter)[:5])
+    if not matches:
+        return None
+    # Return the first match in the order keywords appeared (earliest mention wins)
+    match_by_id = {m.identificador.lower(): m for m in matches}
+    for kw in all_keywords:
+        if kw.lower() in match_by_id:
+            return match_by_id[kw.lower()]
+    return matches[0]
+
+
 def search_properties(current_message, conversation_messages=None):
     """Hybrid property search: try current message first, fall back to full history.
 
-    Strategy:
-    1. Identifier match on current message (always, even with 1 keyword)
-    2. Keyword search on current message (only with 2+ keywords to avoid
-       generic follow-ups like "que piso" matching unrelated properties)
-    3. Full search on conversation history (for follow-up questions)
-
-    Args:
-        current_message: the latest user message string.
-        conversation_messages: optional list of message dicts with 'role' and 'content' keys
-                              (full conversation history for fallback).
+    Always ensures the "active property" (identified from conversation history)
+    is included in results, even when the current message matches other properties.
     """
     current_keywords = _extract_keywords(current_message)
     base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
+
+    # Always find the "active property" from conversation history
+    active_prop = _find_conversation_property(conversation_messages, base_qs)
 
     # Step 1: Identifier match on current message (always check)
     if current_keywords:
@@ -137,13 +164,16 @@ def search_properties(current_message, conversation_messages=None):
         if id_matches.exists():
             return id_matches[:10]
 
-    # Step 2: Keyword search on current message.
-    # With 2+ keywords, always search. With 1 keyword, only search if it matches
-    # a distrito or tipologia (specific fields) to avoid false matches from
-    # generic words like "piso" or "vista".
+    # Step 2: Keyword search on current message
     if len(current_keywords) >= 2:
         results = _search_by_text(current_message)
         if results.exists():
+            # If results don't include the active property, add it
+            if active_prop:
+                result_ids = set(results.values_list('id', flat=True))
+                if active_prop.id not in result_ids:
+                    logger.info(f"Search returned {list(result_ids)} but active property is {active_prop.identificador}, adding it")
+                    return base_qs.filter(Q(id=active_prop.id) | Q(id__in=result_ids))[:10]
             return results
     elif len(current_keywords) == 1:
         kw = current_keywords[0]
@@ -151,9 +181,18 @@ def search_properties(current_message, conversation_messages=None):
             Q(distrito__icontains=kw) | Q(tipologia__icontains=kw)
         )
         if single_kw_qs.exists():
+            if active_prop:
+                result_ids = set(single_kw_qs.values_list('id', flat=True))
+                if active_prop.id not in result_ids:
+                    return base_qs.filter(Q(id=active_prop.id) | Q(id__in=result_ids))[:10]
             return single_kw_qs[:10]
 
-    # Step 3: Full search on conversation history (maintains context for follow-ups)
+    # Step 3: Return active property if we have one (follow-up questions)
+    if active_prop:
+        logger.info(f"No current-message match, using active property: {active_prop.identificador}")
+        return base_qs.filter(id=active_prop.id)
+
+    # Step 4: Full search on conversation history
     if conversation_messages:
         combined_text = ' '.join(
             msg['content'] for msg in conversation_messages
@@ -505,6 +544,8 @@ def get_chat_response(conversation, user_message):
     conversation_msgs.append({'role': 'user', 'content': user_message})
 
     properties = search_properties(user_message, conversation_messages=conversation_msgs)
+    prop_ids = [p.identificador for p in properties] if properties else []
+    logger.info(f"[{conversation.session_id}] msg={user_message!r} → properties={prop_ids}")
     property_context = ""
     if properties:
         formatted = [format_property(p) for p in properties]
