@@ -226,9 +226,12 @@ def search_properties(current_message, conversation_messages=None):
             return results
     elif len(current_keywords) == 1:
         kw = current_keywords[0]
-        single_kw_qs = base_qs.filter(
-            Q(distrito__icontains=kw) | Q(tipologia__icontains=kw)
-        )
+        # Expand synonym for single-keyword search too
+        syn = SEARCH_SYNONYMS.get(kw)
+        kw_filter = Q(distrito__icontains=kw) | Q(tipologia__icontains=kw) | Q(habitaciones__icontains=kw) | Q(piso__icontains=kw)
+        if syn:
+            kw_filter |= Q(habitaciones__icontains=syn) | Q(piso__icontains=syn)
+        single_kw_qs = base_qs.filter(kw_filter)
         if single_kw_qs.exists():
             if active_prop:
                 result_ids = set(single_kw_qs.values_list('id', flat=True))
@@ -648,12 +651,12 @@ def get_chat_response(conversation, user_message):
         "\n- Confía en el resultado del tool. Si reporta éxito, responde con seguridad. NUNCA te disculpes si fue exitoso."
         "\n- Si el cliente pregunta de qué es una foto, responde con seguridad usando el tag de la imagen."
         "\n- NUNCA mezcles información de una propiedad con otra."
-        "\n\nINFORMACIÓN DE PROPIEDADES:"
+        "\n\nINFORMACIÓN DE PROPIEDADES (REGLAS OBLIGATORIAS):"
         "\n- Si la información de una propiedad aparece en el contexto de arriba, ÚSALA. Tienes toda la info disponible."
         "\n- NUNCA digas 'no tengo esa información' o 'no cuento con esos datos' si la info está en el contexto de propiedades."
         "\n- Solo di que no tienes info si realmente NO aparece en el contexto."
-        "\n- SIEMPRE incluye el identificador (ej: CT233, ST355) cuando menciones cualquier propiedad. Ejemplo: 'el departamento ST355 en San Isidro'."
-        "\n- NUNCA menciones una propiedad que NO aparece en el contexto de propiedades. Solo puedes hablar de propiedades listadas arriba."
+        "\n- OBLIGATORIO: SIEMPRE incluye el código identificador entre paréntesis cuando menciones una propiedad. Ejemplo: 'el departamento en San Isidro (ST355)'. Esto aplica CADA VEZ que nombres una propiedad, sin excepción."
+        "\n- NUNCA menciones, sugieras ni hables de una propiedad que NO aparece en el contexto de propiedades de arriba. Solo puedes recomendar propiedades que están listadas en '=== PROPIEDADES EN BASE DE DATOS ==='."
         "\n\nAGENTE DE LA PROPIEDAD (CRÍTICO):"
         "\n- Cada propiedad tiene un agente asignado que aparece en el contexto como 'Agente: Nombre (Tel: ..., Email: ...)'."
         "\n- Cuando necesites referir al cliente con un agente, SIEMPRE usa el nombre y teléfono del agente que aparece en la ficha de ESA propiedad."
