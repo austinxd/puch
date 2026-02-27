@@ -41,6 +41,7 @@ SEARCH_STOPWORDS = {
     'tarde', 'dias', 'nombre', 'llamo', 'llama', 'soy',
     'ubicacion', 'ubicación', 'direccion', 'dirección',
     'puede', 'podria', 'podría', 'seria', 'sería', 'gustaria', 'gustaría',
+    'igual', 'quiere', 'confirmo', 'confirmar', 'efectivo', 'listo', 'lista',
 }
 
 
@@ -48,6 +49,21 @@ def _extract_keywords(text):
     """Extract meaningful keywords from text, filtering stopwords."""
     words = re.findall(r'\w+', text.lower())
     return [w for w in words if w not in SEARCH_STOPWORDS and len(w) > 2]
+
+
+SEARCH_SYNONYMS = {
+    'dormitorio': 'habitacion',
+    'dormitorios': 'habitaciones',
+    'cuarto': 'habitacion',
+    'cuartos': 'habitaciones',
+    'baño': 'bano',
+    'baños': 'banos',
+    'estacionamiento': 'cochera',
+    'estacionamientos': 'cocheras',
+    'garage': 'cochera',
+    'primer': 'primer',
+    'primero': 'primer',
+}
 
 
 def _search_by_text(text):
@@ -59,11 +75,18 @@ def _search_by_text(text):
     if not keywords:
         return Property.objects.none()
 
+    # Expand synonyms: add the synonym as an extra search term
+    expanded = list(keywords)
+    for kw in keywords:
+        syn = SEARCH_SYNONYMS.get(kw)
+        if syn and syn not in expanded:
+            expanded.append(syn)
+
     base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
 
     # Step 1: Exact identifier match (highest priority)
     id_filter = Q()
-    for kw in keywords:
+    for kw in expanded:
         id_filter |= Q(identificador__iexact=kw)
     id_matches = base_qs.filter(id_filter)
     if id_matches.exists():
@@ -71,7 +94,7 @@ def _search_by_text(text):
 
     # Step 2: Full keyword search across all property fields + agent name
     keyword_filter = Q()
-    for kw in keywords:
+    for kw in expanded:
         keyword_filter |= (
             Q(distrito__icontains=kw) |
             Q(tipologia__icontains=kw) |
@@ -80,6 +103,7 @@ def _search_by_text(text):
             Q(clase__icontains=kw) |
             Q(operacion__icontains=kw) |
             Q(habitaciones__icontains=kw) |
+            Q(piso__icontains=kw) |
             Q(calle__icontains=kw) |
             Q(agent__name__icontains=kw)
         )
@@ -121,11 +145,11 @@ def _find_conversation_property(conversation_messages, base_qs):
     """Find the main property being discussed from conversation history identifiers."""
     if not conversation_messages:
         return None
-    # Collect all keywords from user messages
+    # Collect all keywords from user AND assistant messages
+    # (the bot may mention a property identifier the user never typed)
     all_keywords = []
     for msg in conversation_messages:
-        if msg.get('role') == 'user':
-            all_keywords.extend(_extract_keywords(msg['content']))
+        all_keywords.extend(_extract_keywords(msg['content']))
     if not all_keywords:
         return None
     # Single query: check if any keyword matches a property identifier
@@ -135,9 +159,9 @@ def _find_conversation_property(conversation_messages, base_qs):
     matches = list(base_qs.filter(id_filter)[:5])
     if not matches:
         return None
-    # Return the first match in the order keywords appeared (earliest mention wins)
+    # Return the last match in conversation order (most recently mentioned property wins)
     match_by_id = {m.identificador.lower(): m for m in matches}
-    for kw in all_keywords:
+    for kw in reversed(all_keywords):
         if kw.lower() in match_by_id:
             return match_by_id[kw.lower()]
     return matches[0]
