@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
 import ChatMessage from '../../components/ChatMessage'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface Conversation {
   session_id: string
@@ -18,9 +19,19 @@ interface Message {
   created_at: string
 }
 
+interface DebugData {
+  last_user_message: string
+  extracted_keywords: string[]
+  active_property: string | null
+  search_results: { identificador: string; nombre: string; agent: string | null }[]
+  total_messages: number
+  agent_assigned: string | null
+}
+
 const POLL_INTERVAL = 5000
 
 export default function AssistantChat() {
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -45,6 +56,24 @@ export default function AssistantChat() {
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isNearBottomRef = useRef(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Debug panel (admin only)
+  const [debugData, setDebugData] = useState<DebugData | null>(null)
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [debugLoading, setDebugLoading] = useState(false)
+
+  const fetchDebug = useCallback(async (sessionId: string) => {
+    if (!user?.is_admin) return
+    setDebugLoading(true)
+    try {
+      const res = await api.get(`/chat/${sessionId}/debug/`)
+      setDebugData(res.data)
+    } catch {
+      setDebugData(null)
+    } finally {
+      setDebugLoading(false)
+    }
+  }, [user?.is_admin])
 
   const fetchConversations = useCallback(async (silent = false, search = '') => {
     if (!silent) setLoading(true)
@@ -130,8 +159,10 @@ export default function AssistantChat() {
     isNearBottomRef.current = true
     setLoadingMessages(true)
     setReplyText('')
+    setDebugData(null)
     await fetchMessages(sessionId)
     setLoadingMessages(false)
+    fetchDebug(sessionId)
   }
 
   const goBackToList = () => {
@@ -140,6 +171,8 @@ export default function AssistantChat() {
     setMessages([])
     setIsPaused(false)
     setPauseRemaining(0)
+    setDebugData(null)
+    setDebugOpen(false)
   }
 
   const sendAdminReply = async () => {
@@ -316,6 +349,87 @@ export default function AssistantChat() {
                     >
                       Reanudar
                     </button>
+                  </div>
+                )}
+
+                {/* Debug panel (admin only) */}
+                {user?.is_admin && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => {
+                        setDebugOpen(!debugOpen)
+                        if (!debugOpen && selectedId && !debugData) fetchDebug(selectedId)
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <svg className={`w-3 h-3 transition-transform ${debugOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      Debug
+                    </button>
+                    {debugOpen && (
+                      <div className="mt-1 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-2 max-h-60 overflow-y-auto">
+                        {debugLoading ? (
+                          <p className="text-gray-400">Cargando...</p>
+                        ) : !debugData ? (
+                          <p className="text-gray-400">No hay datos de debug</p>
+                        ) : (
+                          <>
+                            <div>
+                              <span className="font-semibold text-gray-600">Ultimo mensaje:</span>{' '}
+                              <span className="text-gray-800">{debugData.last_user_message}</span>
+                            </div>
+                            <div>
+                              <span className="font-semibold text-gray-600">Keywords:</span>{' '}
+                              {debugData.extracted_keywords.length > 0 ? (
+                                debugData.extracted_keywords.map((kw, i) => (
+                                  <span key={i} className="inline-block bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded mr-1 mb-0.5">
+                                    {kw}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-400">ninguna</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-gray-600">Propiedad activa:</span>{' '}
+                              <span className={debugData.active_property ? 'text-green-700 font-medium' : 'text-gray-400'}>
+                                {debugData.active_property || 'ninguna'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="font-semibold text-gray-600">Agente asignado:</span>{' '}
+                              <span className="text-gray-800">{debugData.agent_assigned || 'ninguno'}</span>
+                            </div>
+                            <div>
+                              <span className="font-semibold text-gray-600">Resultados busqueda ({debugData.search_results.length}):</span>
+                              {debugData.search_results.length > 0 ? (
+                                <ul className="mt-1 space-y-0.5 ml-2">
+                                  {debugData.search_results.map((p, i) => (
+                                    <li key={i} className="text-gray-700">
+                                      <span className="font-mono font-medium">{p.identificador}</span>
+                                      {' — '}{p.nombre}
+                                      {p.agent && <span className="text-gray-400 ml-1">({p.agent})</span>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <span className="text-gray-400 ml-1">sin resultados</span>
+                              )}
+                            </div>
+                            <div className="text-gray-400">
+                              Total mensajes: {debugData.total_messages}
+                            </div>
+                            <button
+                              onClick={() => selectedId && fetchDebug(selectedId)}
+                              className="text-indigo-600 hover:text-indigo-800 font-medium"
+                            >
+                              Refrescar
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
