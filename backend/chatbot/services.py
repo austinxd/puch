@@ -142,7 +142,11 @@ def assign_conversation_agent(conversation, first_message):
 
 
 def _find_conversation_property(conversation_messages, base_qs):
-    """Find the main property being discussed from conversation history identifiers."""
+    """Find the main property being discussed from conversation history.
+
+    Checks ALL messages (user + assistant) for property identifiers.
+    The most recently mentioned property wins (latest in conversation).
+    """
     if not conversation_messages:
         return None
     # Collect all keywords from user AND assistant messages
@@ -157,6 +161,26 @@ def _find_conversation_property(conversation_messages, base_qs):
     for kw in set(all_keywords):
         id_filter |= Q(identificador__iexact=kw)
     matches = list(base_qs.filter(id_filter)[:5])
+
+    # Fallback: also check assistant messages for property names (e.g. "Santo Toribio")
+    if len(matches) <= 1:
+        all_props = list(base_qs.values_list('id', 'identificador', 'nombre', 'calle'))
+        for prop_id, ident, nombre, calle in all_props:
+            if ident.lower() in {kw.lower() for kw in all_keywords}:
+                continue  # already matched by identifier
+            # Check if property name words appear in assistant messages
+            for msg in conversation_messages:
+                if msg.get('role') != 'assistant':
+                    continue
+                content_lower = msg['content'].lower()
+                name_words = [w for w in re.findall(r'\w+', nombre.lower()) if len(w) > 3]
+                if name_words and all(w in content_lower for w in name_words):
+                    # Found a property name match in assistant message - add it
+                    prop_obj = base_qs.filter(id=prop_id).first()
+                    if prop_obj and prop_obj not in matches:
+                        matches.append(prop_obj)
+                    break
+
     if not matches:
         return None
     # Return the last match in conversation order (most recently mentioned property wins)
@@ -164,7 +188,8 @@ def _find_conversation_property(conversation_messages, base_qs):
     for kw in reversed(all_keywords):
         if kw.lower() in match_by_id:
             return match_by_id[kw.lower()]
-    return matches[0]
+    # If no identifier matched in keyword order, return the last name-matched property
+    return matches[-1]
 
 
 def search_properties(current_message, conversation_messages=None):
@@ -627,6 +652,8 @@ def get_chat_response(conversation, user_message):
         "\n- Si la información de una propiedad aparece en el contexto de arriba, ÚSALA. Tienes toda la info disponible."
         "\n- NUNCA digas 'no tengo esa información' o 'no cuento con esos datos' si la info está en el contexto de propiedades."
         "\n- Solo di que no tienes info si realmente NO aparece en el contexto."
+        "\n- SIEMPRE incluye el identificador (ej: CT233, ST355) cuando menciones cualquier propiedad. Ejemplo: 'el departamento ST355 en San Isidro'."
+        "\n- NUNCA menciones una propiedad que NO aparece en el contexto de propiedades. Solo puedes hablar de propiedades listadas arriba."
         "\n\nAGENTE DE LA PROPIEDAD (CRÍTICO):"
         "\n- Cada propiedad tiene un agente asignado que aparece en el contexto como 'Agente: Nombre (Tel: ..., Email: ...)'."
         "\n- Cuando necesites referir al cliente con un agente, SIEMPRE usa el nombre y teléfono del agente que aparece en la ficha de ESA propiedad."
