@@ -657,6 +657,7 @@ def get_chat_response(conversation, user_message):
         "\n- Solo di que no tienes info si realmente NO aparece en el contexto."
         "\n- OBLIGATORIO: SIEMPRE incluye el código identificador entre paréntesis cuando menciones una propiedad. Ejemplo: 'el departamento en San Isidro (ST355)'. Esto aplica CADA VEZ que nombres una propiedad, sin excepción."
         "\n- NUNCA menciones, sugieras ni hables de una propiedad que NO aparece en el contexto de propiedades de arriba. Solo puedes recomendar propiedades que están listadas en '=== PROPIEDADES EN BASE DE DATOS ==='."
+        "\n- Si el cliente cambia de criterio (más habitaciones, otro distrito, etc.) y el contexto tiene propiedades que cumplen con lo que pide, recomiéndalas de inmediato con sus datos. NO preguntes si quiere ver opciones cuando ya las tienes disponibles."
         "\n\nAGENTE DE LA PROPIEDAD (CRÍTICO):"
         "\n- Cada propiedad tiene un agente asignado que aparece en el contexto como 'Agente: Nombre (Tel: ..., Email: ...)'."
         "\n- Cuando necesites referir al cliente con un agente, SIEMPRE usa el nombre y teléfono del agente que aparece en la ficha de ESA propiedad."
