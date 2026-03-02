@@ -679,7 +679,9 @@ def get_chat_response(conversation, user_message):
     for msg in history[:-1]:
         # Map admin messages to assistant role for OpenAI
         role = 'assistant' if msg.role == 'admin' else msg.role
-        messages.append({"role": role, "content": msg.content})
+        # Strip [media:] tags from history so the AI doesn't see/echo URLs
+        content = re.sub(r'\[media:\w+\][^\[]*\[/media\]', '', msg.content).strip()
+        messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": user_message})
 
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -731,6 +733,18 @@ def get_chat_response(conversation, user_message):
         response_message = response.choices[0].message
 
     reply = response_message.content
+
+    # Safety net: strip any media URLs the AI wrote directly in the text
+    # Remove markdown image links: ![alt](https://api.brikia.tech/media/...)
+    reply = re.sub(r'!\[[^\]]*\]\(https?://[^\)]*brikia\.tech/media/[^\)]*\)', '', reply)
+    # Remove bare media URLs or markdown links to media
+    reply = re.sub(r'\[?[^\]]*\]?\(https?://[^\)]*brikia\.tech/media/properties/[^\)]*\)', '', reply)
+    # Remove any remaining bare media URLs
+    reply = re.sub(r'https?://[^\s]*brikia\.tech/media/properties/\S+', '', reply)
+    # Clean up leftover numbered list items that are now empty (e.g. "1. \n2. \n")
+    reply = re.sub(r'^\d+\.\s*$', '', reply, flags=re.MULTILINE)
+    # Clean up excessive blank lines
+    reply = re.sub(r'\n{3,}', '\n\n', reply).strip()
 
     extract_intent(conversation)
 
