@@ -336,21 +336,28 @@ export default function AssistantChat() {
                   )}
                 </div>
 
-                {/* Pause indicator */}
-                {isPaused && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
-                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                      IA pausada — {formatCountdown(pauseRemaining)}
+                {/* AI status indicator */}
+                <div className="mt-2 flex items-center gap-2">
+                  {isPaused ? (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                        IA pausada — {formatCountdown(pauseRemaining)}
+                      </span>
+                      <button
+                        onClick={unpauseAI}
+                        className="px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 rounded-full transition-colors"
+                      >
+                        Reanudar IA
+                      </button>
+                    </>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                      IA activa
                     </span>
-                    <button
-                      onClick={unpauseAI}
-                      className="px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 rounded-full transition-colors"
-                    >
-                      Reanudar
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Debug panel (admin only) */}
                 {user?.is_admin && (
