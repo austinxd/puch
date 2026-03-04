@@ -200,7 +200,7 @@ export default function AnalyticsDashboard() {
               <p className="text-sm text-gray-400">Sin datos aún</p>
             ) : (
               <div className="space-y-3">
-                {data.top_properties.map((prop, i) => {
+                {data.top_properties.map((prop) => {
                   const max = data.top_properties[0].count
                   return (
                     <div key={prop.identificador}>
