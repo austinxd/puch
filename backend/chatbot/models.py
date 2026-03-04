@@ -14,6 +14,12 @@ class ChatConversation(models.Model):
         on_delete=models.SET_NULL,
         related_name='conversations',
     )
+    first_property = models.ForeignKey(
+        'properties.Property',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='first_intent_conversations',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     admin_paused_until = models.DateTimeField(null=True, blank=True)
 

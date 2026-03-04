@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from properties.permissions import IsAdmin
 from .models import ChatConversation, ChatMessage, ClientIntent
+from properties.models import Property
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,28 @@ class AnalyticsView(APIView):
                     if d:
                         intent_stats['distritos'][d] = intent_stats['distritos'].get(d, 0) + 1
 
+        # Most searched properties (first intent)
+        top_properties = list(
+            ChatConversation.objects
+            .filter(first_property__isnull=False)
+            .values(
+                'first_property__identificador',
+                'first_property__nombre',
+                'first_property__distrito',
+            )
+            .annotate(count=Count('id'))
+            .order_by('-count')[:10]
+        )
+        top_properties_list = [
+            {
+                'identificador': p['first_property__identificador'],
+                'nombre': p['first_property__nombre'],
+                'distrito': p['first_property__distrito'],
+                'count': p['count'],
+            }
+            for p in top_properties
+        ]
+
         return Response({
             'total_conversations': total_conversations,
             'total_messages': total_messages,
@@ -104,6 +127,7 @@ class AnalyticsView(APIView):
             'hour_distribution': hour_distribution,
             'depth_distribution': depth_dist,
             'intents': intent_stats,
+            'top_properties': top_properties_list,
         })
 
 

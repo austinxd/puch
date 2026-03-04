@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import api from '../../api/client'
 
+interface TopProperty {
+  identificador: string
+  nombre: string
+  distrito: string
+  count: number
+}
+
 interface Analytics {
   total_conversations: number
   total_messages: number
@@ -17,6 +24,7 @@ interface Analytics {
     tipo_propiedad: Record<string, number>
     distritos: Record<string, number>
   }
+  top_properties: TopProperty[]
 }
 
 interface Intent {
@@ -179,10 +187,42 @@ export default function AnalyticsDashboard() {
             <BarChart data={data.hour_distribution} label="Mensajes por hora" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <BarChart data={data.intents.operacion} label="Operación buscada" />
             <BarChart data={data.intents.tipo_propiedad} label="Tipo de propiedad" />
             <BarChart data={data.intents.distritos} label="Distritos de interés" />
+          </div>
+
+          {/* Top properties by first intent */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Propiedades más buscadas (primera intención)</h3>
+            {data.top_properties.length === 0 ? (
+              <p className="text-sm text-gray-400">Sin datos aún</p>
+            ) : (
+              <div className="space-y-3">
+                {data.top_properties.map((prop, i) => {
+                  const max = data.top_properties[0].count
+                  return (
+                    <div key={prop.identificador}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-700">
+                          <span className="font-mono font-medium text-indigo-600">{prop.identificador}</span>
+                          {' — '}{prop.nombre}
+                          {prop.distrito && <span className="text-gray-400 ml-1">({prop.distrito})</span>}
+                        </span>
+                        <span className="text-gray-500 font-medium">{prop.count} consulta{prop.count !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-indigo-600 h-2 rounded-full transition-all"
+                          style={{ width: `${(prop.count / max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

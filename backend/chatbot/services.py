@@ -136,9 +136,12 @@ def assign_conversation_agent(conversation, first_message):
     results = _search_by_text(first_message)
     if results.exists():
         prop = results.first()
+        conversation.first_property = prop
+        update_fields = ['first_property']
         if prop.agent:
             conversation.agent = prop.agent
-            conversation.save(update_fields=['agent'])
+            update_fields.append('agent')
+        conversation.save(update_fields=update_fields)
 
 
 def _find_conversation_property(conversation_messages, base_qs):
