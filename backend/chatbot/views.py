@@ -158,6 +158,7 @@ class ChatHistoryView(APIView):
             'session_id': str(session_id),
             'messages': list(messages),
             'is_ai_paused': conversation.is_ai_paused,
+            'is_permanently_paused': conversation.is_permanently_paused,
             'admin_paused_until': conversation.admin_paused_until,
             'pause_remaining_seconds': pause_remaining,
         })
@@ -301,7 +302,12 @@ class AdminReplyView(APIView):
             content=message,
         )
 
-        conversation.pause_ai(minutes=30)
+        pause_mode = request.data.get('pause_mode', 'auto')
+        if pause_mode == 'permanent':
+            conversation.pause_ai(permanent=True)
+        elif pause_mode == 'auto':
+            conversation.pause_ai(minutes=30)
+        # 'none' = don't pause
 
         # If session_id is a phone number, send via WhatsApp
         if session_id.isdigit() and len(session_id) >= 7:
@@ -324,6 +330,34 @@ class AdminUnpauseView(APIView):
 
         conversation.unpause_ai()
         return Response({'status': 'unpaused'})
+
+
+class AdminPauseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        mode = request.data.get('mode', 'auto')
+        try:
+            conversation = ChatConversation.objects.get(session_id=session_id)
+        except ChatConversation.DoesNotExist:
+            return Response(
+                {'error': 'Conversación no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if mode == 'off':
+            conversation.unpause_ai()
+        elif mode == 'permanent':
+            conversation.pause_ai(permanent=True)
+        else:
+            conversation.pause_ai(minutes=30)
+
+        return Response({
+            'status': 'ok',
+            'is_ai_paused': conversation.is_ai_paused,
+            'is_permanently_paused': conversation.is_permanently_paused,
+            'admin_paused_until': conversation.admin_paused_until,
+        })
 
 
 class ChatDebugView(APIView):

@@ -50,7 +50,10 @@ export default function AssistantChat() {
 
   // Pause state
   const [isPaused, setIsPaused] = useState(false)
+  const [isPermanentlyPaused, setIsPermanentlyPaused] = useState(false)
   const [pauseRemaining, setPauseRemaining] = useState(0)
+  const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
+  const pauseMenuRef = useRef<HTMLDivElement>(null)
 
   // Scroll tracking
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -86,6 +89,7 @@ export default function AssistantChat() {
     const res = await api.get(`/chat/${sessionId}/`)
     setMessages(res.data.messages)
     setIsPaused(!!res.data.is_ai_paused)
+    setIsPermanentlyPaused(!!res.data.is_permanently_paused)
     setPauseRemaining(res.data.pause_remaining_seconds || 0)
   }, [])
 
@@ -132,9 +136,9 @@ export default function AssistantChat() {
     }
   }, [messages])
 
-  // Pause countdown
+  // Pause countdown (skip for permanent pauses)
   useEffect(() => {
-    if (pauseRemaining <= 0) return
+    if (pauseRemaining <= 0 || isPermanentlyPaused) return
     const interval = setInterval(() => {
       setPauseRemaining((prev) => {
         if (prev <= 1) {
@@ -145,7 +149,18 @@ export default function AssistantChat() {
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [pauseRemaining])
+  }, [pauseRemaining, isPermanentlyPaused])
+
+  // Close pause menu on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (pauseMenuRef.current && !pauseMenuRef.current.contains(e.target as Node)) {
+        setPauseMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   const handleScroll = () => {
     const el = messagesContainerRef.current
@@ -170,7 +185,9 @@ export default function AssistantChat() {
     selectedIdRef.current = null
     setMessages([])
     setIsPaused(false)
+    setIsPermanentlyPaused(false)
     setPauseRemaining(0)
+    setPauseMenuOpen(false)
     setDebugData(null)
     setDebugOpen(false)
   }
@@ -193,7 +210,15 @@ export default function AssistantChat() {
     if (!selectedId) return
     await api.post(`/chat/${selectedId}/unpause/`)
     setIsPaused(false)
+    setIsPermanentlyPaused(false)
     setPauseRemaining(0)
+  }
+
+  const pauseAI = async (mode: 'auto' | 'permanent') => {
+    if (!selectedId) return
+    await api.post(`/chat/${selectedId}/pause/`, { mode })
+    setPauseMenuOpen(false)
+    await fetchMessages(selectedId)
   }
 
   const isPhone = (id: string) => /^\d{7,15}$/.test(id)
@@ -338,7 +363,20 @@ export default function AssistantChat() {
 
                 {/* AI status indicator */}
                 <div className="mt-2 flex items-center gap-2">
-                  {isPaused ? (
+                  {isPermanentlyPaused ? (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                        IA pausada definitivamente
+                      </span>
+                      <button
+                        onClick={unpauseAI}
+                        className="px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                      >
+                        Reanudar IA
+                      </button>
+                    </>
+                  ) : isPaused ? (
                     <>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
                         <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
@@ -352,10 +390,36 @@ export default function AssistantChat() {
                       </button>
                     </>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                      IA activa
-                    </span>
+                    <>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                        IA activa
+                      </span>
+                      <div className="relative" ref={pauseMenuRef}>
+                        <button
+                          onClick={() => setPauseMenuOpen(!pauseMenuOpen)}
+                          className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                        >
+                          Pausar
+                        </button>
+                        {pauseMenuOpen && (
+                          <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px]">
+                            <button
+                              onClick={() => pauseAI('auto')}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg transition-colors"
+                            >
+                              Pausar 30 min
+                            </button>
+                            <button
+                              onClick={() => pauseAI('permanent')}
+                              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
+                            >
+                              Pausar definitivamente
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
 

@@ -1,6 +1,9 @@
+import datetime
 import uuid
 from django.db import models
 from django.utils import timezone
+
+PERMANENT_PAUSE_DATE = datetime.datetime(9999, 12, 31, tzinfo=datetime.timezone.utc)
 
 
 class ChatConversation(models.Model):
@@ -24,8 +27,16 @@ class ChatConversation(models.Model):
     def is_ai_paused(self):
         return self.admin_paused_until and self.admin_paused_until > timezone.now()
 
-    def pause_ai(self, minutes=30):
-        self.admin_paused_until = timezone.now() + timezone.timedelta(minutes=minutes)
+    @property
+    def is_permanently_paused(self):
+        return (self.admin_paused_until and
+                self.admin_paused_until.year >= 9999)
+
+    def pause_ai(self, minutes=30, permanent=False):
+        if permanent:
+            self.admin_paused_until = PERMANENT_PAUSE_DATE
+        else:
+            self.admin_paused_until = timezone.now() + timezone.timedelta(minutes=minutes)
         self.save(update_fields=['admin_paused_until'])
 
     def unpause_ai(self):
