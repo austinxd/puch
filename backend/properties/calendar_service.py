@@ -324,7 +324,7 @@ def create_appointment(agent_id, property_id, client_name, client_phone, date_st
             import resend
             resend.api_key = settings.RESEND_API_KEY
             resend.Emails.send({
-                'from': 'Brikia <notificaciones@citas.brikia.tech>',
+                'from': 'Brikia <notificaciones@brikia.tech>',
                 'to': [agent.email],
                 'subject': f'Nueva cita: {client_name} - {prop.identificador}',
                 'html': (
