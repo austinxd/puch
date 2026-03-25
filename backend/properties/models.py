@@ -31,6 +31,17 @@ class Agent(models.Model):
         return self.name
 
 
+class Prohibicion(models.Model):
+    nombre = models.CharField(max_length=200, unique=True)
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name_plural = 'prohibiciones'
+
+    def __str__(self):
+        return self.nombre
+
+
 class Property(models.Model):
     class Clase(models.TextChoices):
         INDUSTRIAL = 'Industrial', 'Industrial'
@@ -89,6 +100,7 @@ class Property(models.Model):
     parametros_usos = models.TextField(blank=True, default='')
     financiamiento = models.TextField(blank=True, default='')
     recorrido_360 = models.CharField(max_length=500, blank=True, default='')
+    prohibiciones = models.ManyToManyField(Prohibicion, blank=True)
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

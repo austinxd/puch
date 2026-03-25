@@ -13,6 +13,11 @@ interface PropertyVideo {
   video: string
 }
 
+interface Prohibicion {
+  id: number
+  nombre: string
+}
+
 interface Property {
   id: number
   identificador: string
@@ -49,6 +54,7 @@ interface Property {
   images: PropertyImage[]
   videos: PropertyVideo[]
   recorrido_360: string
+  prohibiciones_detail: Prohibicion[]
   activo: boolean
   agent_name: string
   agent: number | null
@@ -155,6 +161,19 @@ export default function PropertyDetail() {
       {property.pitch && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6">
           <p className="text-sm text-indigo-900">{property.pitch}</p>
+        </div>
+      )}
+
+      {property.prohibiciones_detail?.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">Prohibiciones</h3>
+          <div className="flex flex-wrap gap-2">
+            {property.prohibiciones_detail.map((p) => (
+              <span key={p.id} className="inline-flex items-center bg-red-100 text-red-800 text-sm px-3 py-1 rounded-full">
+                {p.nombre}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

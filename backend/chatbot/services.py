@@ -82,7 +82,7 @@ def _search_by_text(text):
         if syn and syn not in expanded:
             expanded.append(syn)
 
-    base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
+    base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos', 'prohibiciones')
 
     # Step 1: Exact identifier match (highest priority)
     id_filter = Q()
@@ -202,7 +202,7 @@ def search_properties(current_message, conversation_messages=None):
     is included in results, even when the current message matches other properties.
     """
     current_keywords = _extract_keywords(current_message)
-    base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos')
+    base_qs = Property.objects.filter(activo=True).select_related('agent').prefetch_related('images', 'videos', 'prohibiciones')
 
     # Always find the "active property" from conversation history
     active_prop = _find_conversation_property(conversation_messages, base_qs)
@@ -297,6 +297,12 @@ def format_property(prop):
         f"  Financiamiento: {prop.financiamiento}" if prop.financiamiento else "",
         f"  Agente: {prop.agent.name} (Tel: {prop.agent.phone}, Email: {prop.agent.email})" if prop.agent else "",
     ]
+    # Prohibiciones (solo Industrial/Comercial)
+    if prop.clase in ('Industrial', 'Comercial'):
+        prohibiciones = list(prop.prohibiciones.all())
+        if prohibiciones:
+            nombres = ', '.join(p.nombre for p in prohibiciones)
+            lines.append(f"  Prohibiciones: {nombres}")
     images = list(prop.images.all())
     if images:
         tags = set(img.tag for img in images if img.tag)

@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Agent, Appointment, Property, PropertyImage, PropertyVideo
+from .models import Agent, Appointment, Prohibicion, Property, PropertyImage, PropertyVideo
 
 User = get_user_model()
 
@@ -92,10 +92,17 @@ class PropertyListSerializer(serializers.ModelSerializer):
         return None
 
 
+class ProhibicionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Prohibicion
+        fields = ['id', 'nombre']
+
+
 class PropertySerializer(serializers.ModelSerializer):
     agent_name = serializers.CharField(source='agent.name', read_only=True, default='')
     images = PropertyImageSerializer(many=True, read_only=True)
     videos = PropertyVideoSerializer(many=True, read_only=True)
+    prohibiciones_detail = ProhibicionSerializer(source='prohibiciones', many=True, read_only=True)
 
     class Meta:
         model = Property

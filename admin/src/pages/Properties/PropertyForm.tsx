@@ -14,6 +14,11 @@ interface PropertyImageData {
   tag: string
 }
 
+interface Prohibicion {
+  id: number
+  nombre: string
+}
+
 interface NewImage {
   file: File
   tag: string
@@ -267,12 +272,16 @@ export default function PropertyForm() {
   const [newImages, setNewImages] = useState<NewImage[]>([])
   const [newVideo, setNewVideo] = useState<File | null>(null)
   const [imageTags, setImageTags] = useState<TagOption[]>([])
+  const [prohibicionesCatalog, setProhibicionesCatalog] = useState<Prohibicion[]>([])
+  const [selectedProhibiciones, setSelectedProhibiciones] = useState<number[]>([])
+  const [newProhibicionName, setNewProhibicionName] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.get('/agents/').then((res) => setAgents(res.data.results))
     api.get('/properties/image-tags/').then((res) => setImageTags(res.data))
+    api.get('/properties/prohibiciones/').then((res) => setProhibicionesCatalog(res.data))
     if (isEdit) {
       api.get(`/properties/${id}/`).then((res) => {
         const d = res.data
@@ -284,6 +293,11 @@ export default function PropertyForm() {
         })
         setExistingImages(d.images || [])
         setExistingVideos(d.videos || [])
+        if (d.prohibiciones_detail) {
+          setSelectedProhibiciones(d.prohibiciones_detail.map((p: Prohibicion) => p.id))
+        } else if (d.prohibiciones) {
+          setSelectedProhibiciones(d.prohibiciones)
+        }
       })
     }
   }, [id])
@@ -358,6 +372,7 @@ export default function PropertyForm() {
         ...form,
         agent: form.agent || null,
         precio: form.precio || null,
+        prohibiciones: selectedProhibiciones,
       }
       let propertyId = id
       if (isEdit) {
@@ -524,6 +539,83 @@ export default function PropertyForm() {
             </Field>
           </div>
         </section>
+
+        {/* Prohibiciones (solo Industrial/Comercial) */}
+        {(form.clase === 'Industrial' || form.clase === 'Comercial') && (
+          <section>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Prohibiciones</h3>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {selectedProhibiciones.map((pId) => {
+                const p = prohibicionesCatalog.find((c) => c.id === pId)
+                return p ? (
+                  <span key={pId} className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-sm px-3 py-1 rounded-full">
+                    {p.nombre}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProhibiciones((prev) => prev.filter((x) => x !== pId))}
+                      className="text-red-600 hover:text-red-800 font-bold ml-1"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ) : null
+              })}
+            </div>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <select
+                  className={inputClass}
+                  value=""
+                  onChange={(e) => {
+                    const val = Number(e.target.value)
+                    if (val && !selectedProhibiciones.includes(val)) {
+                      setSelectedProhibiciones((prev) => [...prev, val])
+                    }
+                  }}
+                >
+                  <option value="">Agregar prohibición...</option>
+                  {prohibicionesCatalog
+                    .filter((p) => !selectedProhibiciones.includes(p.id))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={newProhibicionName}
+                  onChange={(e) => setNewProhibicionName(e.target.value)}
+                  placeholder="Nueva prohibición"
+                  className={inputClass + ' w-48'}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const name = newProhibicionName.trim()
+                    if (!name) return
+                    try {
+                      const res = await api.post('/properties/prohibiciones/', { nombre: name })
+                      setProhibicionesCatalog((prev) => [...prev, res.data])
+                      setSelectedProhibiciones((prev) => [...prev, res.data.id])
+                      setNewProhibicionName('')
+                    } catch {
+                      // might already exist, try to find it
+                      const existing = prohibicionesCatalog.find((p) => p.nombre.toLowerCase() === name.toLowerCase())
+                      if (existing && !selectedProhibiciones.includes(existing.id)) {
+                        setSelectedProhibiciones((prev) => [...prev, existing.id])
+                      }
+                      setNewProhibicionName('')
+                    }
+                  }}
+                  className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                >
+                  + Crear
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Medios */}
         <MediaSection

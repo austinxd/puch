@@ -5,6 +5,7 @@ from .views import (
     CalendarEventsView,
     PropertyImageView, PropertyImageDetailView, ImageTagsView,
     PropertyVideoView, PropertyVideoDetailView,
+    ProhibicionListCreateView,
 )
 from .auth_views import LoginView, LogoutView, MeView, MyProfileView
 
@@ -20,6 +21,7 @@ urlpatterns = [
     path('auth/me/', MeView.as_view(), name='auth-me'),
     path('auth/profile/', MyProfileView.as_view(), name='auth-profile'),
     # Property media (before router so they don't get caught by properties/<pk>/)
+    path('properties/prohibiciones/', ProhibicionListCreateView.as_view(), name='prohibiciones'),
     path('properties/image-tags/', ImageTagsView.as_view(), name='image-tags'),
     path('properties/<int:property_id>/images/', PropertyImageView.as_view(), name='property-images'),
     path('properties/<int:property_id>/images/<int:image_id>/', PropertyImageDetailView.as_view(), name='property-image-detail'),

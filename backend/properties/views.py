@@ -5,11 +5,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from .models import Agent, Appointment, Property, PropertyImage, PropertyVideo
+from .models import Agent, Appointment, Prohibicion, Property, PropertyImage, PropertyVideo
 from .permissions import IsAdmin
 from .serializers import (
-    AgentSerializer, AppointmentSerializer, PropertySerializer,
-    PropertyListSerializer, PropertyImageSerializer, PropertyVideoSerializer,
+    AgentSerializer, AppointmentSerializer, ProhibicionSerializer,
+    PropertySerializer, PropertyListSerializer, PropertyImageSerializer,
+    PropertyVideoSerializer,
 )
 from .calendar_service import get_calendar_events
 
@@ -22,7 +23,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
 
 class PropertyViewSet(viewsets.ModelViewSet):
-    queryset = Property.objects.select_related('agent').prefetch_related('images', 'videos').all()
+    queryset = Property.objects.select_related('agent').prefetch_related('images', 'videos', 'prohibiciones').all()
     filterset_fields = ['clase', 'operacion', 'distrito', 'activo']
     search_fields = ['identificador', 'nombre', 'distrito', 'tipologia', 'pitch']
     ordering_fields = ['precio', 'created_at', 'nombre']
@@ -146,3 +147,16 @@ class PropertyVideoDetailView(APIView):
         vid.video.delete(save=False)
         vid.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProhibicionListCreateView(APIView):
+    def get(self, request):
+        qs = Prohibicion.objects.all()
+        serializer = ProhibicionSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = ProhibicionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
