@@ -4,7 +4,7 @@ import logging
 from datetime import date
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, F
 from django.utils import timezone
 from openai import OpenAI
 from properties.models import Property, Agent, Appointment
@@ -586,6 +586,31 @@ Responde SOLO el JSON, sin markdown ni explicación."""
         logger.error(f"Error extracting intent: {e}")
 
 
+def _record_property_interests(conversation, properties):
+    from .models import PropertyInterest
+    property_ids = [p.id for p in properties]
+    if not property_ids:
+        return
+    try:
+        existing = set(
+            PropertyInterest.objects
+            .filter(conversation=conversation, property_id__in=property_ids)
+            .values_list('property_id', flat=True)
+        )
+        new_rows = [
+            PropertyInterest(conversation=conversation, property_id=pid)
+            for pid in property_ids if pid not in existing
+        ]
+        if new_rows:
+            PropertyInterest.objects.bulk_create(new_rows, ignore_conflicts=True)
+        if existing:
+            PropertyInterest.objects.filter(
+                conversation=conversation, property_id__in=existing
+            ).update(last_shown_at=timezone.now(), shown_count=F('shown_count') + 1)
+    except Exception as e:
+        logger.error(f"Error recording property interests: {e}")
+
+
 def get_chat_response(conversation, user_message):
     """Generate a chat response using OpenAI with optional tool calling for calendar and media."""
     if not settings.OPENAI_API_KEY:
@@ -607,6 +632,8 @@ def get_chat_response(conversation, user_message):
     properties = search_properties(user_message, conversation_messages=conversation_msgs)
     prop_ids = [p.identificador for p in properties] if properties else []
     logger.info(f"[{conversation.session_id}] msg={user_message!r} → properties={prop_ids}")
+    if properties:
+        _record_property_interests(conversation, properties)
     property_context = ""
     if properties:
         formatted = [format_property(p) for p in properties]

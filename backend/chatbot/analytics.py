@@ -1,4 +1,6 @@
 import logging
+import re
+from collections import defaultdict
 from django.conf import settings
 from django.db.models import Count, Max, Avg, Min, F, Q
 from django.db.models.functions import TruncDate, TruncHour
@@ -7,8 +9,28 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from properties.permissions import IsAdmin
-from .models import ChatConversation, ChatMessage, ClientIntent
+from .models import ChatConversation, ChatMessage, ClientIntent, PropertyInterest
 from properties.models import Property
+
+
+def normalize_phone(phone):
+    return re.sub(r'\D', '', phone or '')
+
+
+def _property_summary(prop):
+    if prop is None:
+        return None
+    image = prop.images.first() if hasattr(prop, 'images') else None
+    return {
+        'id': prop.id,
+        'identificador': prop.identificador,
+        'nombre': prop.nombre,
+        'distrito': prop.distrito,
+        'tipologia': prop.tipologia,
+        'precio': prop.precio,
+        'moneda': prop.moneda,
+        'image_url': image.image.url if image and image.image else None,
+    }
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +178,208 @@ class IntentListView(APIView):
                 'updated_at': intent.updated_at,
             })
         return Response({'results': results})
+
+
+class ClientListView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        search = (request.query_params.get('search') or '').strip().lower()
+
+        intents = (
+            ClientIntent.objects
+            .exclude(phone='')
+            .select_related('conversation', 'conversation__first_property')
+            .order_by('-updated_at')
+        )
+
+        groups = defaultdict(list)
+        for intent in intents:
+            key = normalize_phone(intent.phone)
+            if key:
+                groups[key].append(intent)
+
+        conv_ids = [i.conversation_id for intents_list in groups.values() for i in intents_list]
+        last_msg_by_conv = dict(
+            ChatMessage.objects
+            .filter(conversation_id__in=conv_ids)
+            .values('conversation_id')
+            .annotate(last=Max('created_at'), count=Count('id'))
+            .values_list('conversation_id', 'last')
+        )
+        msg_count_by_conv = dict(
+            ChatMessage.objects
+            .filter(conversation_id__in=conv_ids)
+            .values('conversation_id')
+            .annotate(c=Count('id'))
+            .values_list('conversation_id', 'c')
+        )
+        interest_count_by_phone = {}
+
+        results = []
+        for phone, intent_list in groups.items():
+            intent_list_sorted = sorted(intent_list, key=lambda i: i.conversation.created_at)
+            latest = max(intent_list, key=lambda i: i.updated_at)
+            conv_ids_phone = [i.conversation_id for i in intent_list]
+
+            distinct_interests = (
+                PropertyInterest.objects
+                .filter(conversation_id__in=conv_ids_phone)
+                .values('property_id').distinct().count()
+            )
+            interest_count_by_phone[phone] = distinct_interests
+
+            last_activity = max(
+                (last_msg_by_conv.get(cid) for cid in conv_ids_phone if last_msg_by_conv.get(cid)),
+                default=latest.updated_at,
+            )
+            total_msgs = sum(msg_count_by_conv.get(cid, 0) for cid in conv_ids_phone)
+
+            first_conv = intent_list_sorted[0].conversation
+            first_prop = _property_summary(first_conv.first_property)
+
+            row = {
+                'phone': phone,
+                'phone_display': latest.phone,
+                'conversation_count': len(set(conv_ids_phone)),
+                'message_count': total_msgs,
+                'last_activity': last_activity,
+                'first_property': first_prop,
+                'interested_count': distinct_interests,
+                'latest_intent': {
+                    'operacion': latest.operacion,
+                    'tipo_propiedad': latest.tipo_propiedad,
+                    'distritos': latest.distritos,
+                    'precio_min': latest.precio_min,
+                    'precio_max': latest.precio_max,
+                    'habitaciones': latest.habitaciones,
+                    'caracteristicas': latest.caracteristicas,
+                    'resumen': latest.resumen,
+                    'updated_at': latest.updated_at,
+                },
+            }
+            results.append(row)
+
+        if search:
+            results = [
+                r for r in results
+                if search in r['phone']
+                or search in (r['latest_intent']['resumen'] or '').lower()
+                or search in (r['latest_intent']['distritos'] or '').lower()
+            ]
+
+        results.sort(key=lambda r: r['last_activity'], reverse=True)
+        return Response({'results': results})
+
+
+class ClientDetailView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, phone):
+        target = normalize_phone(phone)
+        if not target:
+            return Response({'error': 'phone vacío'}, status=400)
+
+        intents = (
+            ClientIntent.objects
+            .exclude(phone='')
+            .select_related('conversation', 'conversation__first_property', 'conversation__agent')
+        )
+        matched = [i for i in intents if normalize_phone(i.phone) == target]
+        if not matched:
+            return Response({'error': 'cliente no encontrado'}, status=404)
+
+        conv_map = {}
+        for intent in matched:
+            conv_map.setdefault(intent.conversation_id, intent.conversation)
+
+        conv_ids = list(conv_map.keys())
+
+        msg_counts = dict(
+            ChatMessage.objects
+            .filter(conversation_id__in=conv_ids)
+            .values('conversation_id')
+            .annotate(c=Count('id'), last=Max('created_at'))
+            .values_list('conversation_id', 'c')
+        )
+        last_msg = dict(
+            ChatMessage.objects
+            .filter(conversation_id__in=conv_ids)
+            .values('conversation_id')
+            .annotate(last=Max('created_at'))
+            .values_list('conversation_id', 'last')
+        )
+
+        conversations = []
+        for cid, conv in sorted(conv_map.items(), key=lambda kv: kv[1].created_at, reverse=True):
+            conversations.append({
+                'session_id': str(conv.session_id),
+                'created_at': conv.created_at,
+                'last_message_at': last_msg.get(cid),
+                'message_count': msg_counts.get(cid, 0),
+                'agent_name': conv.agent.name if conv.agent else None,
+                'first_property': _property_summary(conv.first_property),
+            })
+
+        intents_payload = [
+            {
+                'id': i.id,
+                'session_id': str(i.conversation.session_id),
+                'operacion': i.operacion,
+                'tipo_propiedad': i.tipo_propiedad,
+                'distritos': i.distritos,
+                'precio_min': i.precio_min,
+                'precio_max': i.precio_max,
+                'habitaciones': i.habitaciones,
+                'caracteristicas': i.caracteristicas,
+                'resumen': i.resumen,
+                'created_at': i.created_at,
+                'updated_at': i.updated_at,
+            }
+            for i in sorted(matched, key=lambda x: x.updated_at, reverse=True)
+        ]
+
+        interests = (
+            PropertyInterest.objects
+            .filter(conversation_id__in=conv_ids)
+            .select_related('property')
+            .prefetch_related('property__images')
+        )
+        agg = {}
+        for pi in interests:
+            entry = agg.setdefault(pi.property_id, {
+                'property': _property_summary(pi.property),
+                'first_shown_at': pi.first_shown_at,
+                'last_shown_at': pi.last_shown_at,
+                'shown_count': 0,
+                'session_ids': set(),
+            })
+            entry['shown_count'] += pi.shown_count
+            entry['first_shown_at'] = min(entry['first_shown_at'], pi.first_shown_at)
+            entry['last_shown_at'] = max(entry['last_shown_at'], pi.last_shown_at)
+            entry['session_ids'].add(str(conv_map[pi.conversation_id].session_id))
+
+        interested_properties = sorted(
+            (
+                {
+                    **e,
+                    'session_ids': sorted(e['session_ids']),
+                }
+                for e in agg.values()
+            ),
+            key=lambda e: e['last_shown_at'],
+            reverse=True,
+        )
+
+        latest_intent = intents_payload[0] if intents_payload else None
+        return Response({
+            'phone': target,
+            'phone_display': matched[0].phone,
+            'latest_intent': latest_intent,
+            'intents': intents_payload,
+            'conversations': conversations,
+            'interested_properties': interested_properties,
+        })
 
 
 class DealAnalysisView(APIView):

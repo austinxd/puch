@@ -5,7 +5,10 @@ from .views import (
     ChatDebugView,
 )
 from .whatsapp import WhatsAppWebhookView
-from .analytics import AnalyticsView, IntentListView, DealAnalysisView
+from .analytics import (
+    AnalyticsView, IntentListView, DealAnalysisView,
+    ClientListView, ClientDetailView,
+)
 
 urlpatterns = [
     path('chat/', ChatView.as_view(), name='chat'),
@@ -18,6 +21,8 @@ urlpatterns = [
     path('whatsapp/webhook/', WhatsAppWebhookView.as_view(), name='whatsapp-webhook'),
     path('analytics/', AnalyticsView.as_view(), name='analytics'),
     path('intents/', IntentListView.as_view(), name='intent-list'),
+    path('clients/', ClientListView.as_view(), name='client-list'),
+    path('clients/<str:phone>/', ClientDetailView.as_view(), name='client-detail'),
     path('prompt/', SystemPromptView.as_view(), name='system-prompt'),
     path('prompt/analyze/', PromptAnalysisView.as_view(), name='prompt-analyze'),
     path('analytics/ai-analysis/', DealAnalysisView.as_view(), name='deal-analysis'),

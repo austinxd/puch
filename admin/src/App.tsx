@@ -10,6 +10,8 @@ import AgentForm from './pages/Agents/AgentForm'
 import AppointmentList from './pages/Appointments/AppointmentList'
 import AssistantChat from './pages/Assistant/AssistantChat'
 import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard'
+import ClientList from './pages/Clients/ClientList'
+import ClientDetail from './pages/Clients/ClientDetail'
 import PromptEditor from './pages/Prompt/PromptEditor'
 import PrivacyPolicy from './pages/Legal/PrivacyPolicy'
 import Login from './pages/Login/Login'
@@ -49,6 +51,12 @@ function App() {
                 } />
                 <Route path="/analytics" element={
                   <ProtectedRoute adminOnly><AnalyticsDashboard /></ProtectedRoute>
+                } />
+                <Route path="/clients" element={
+                  <ProtectedRoute adminOnly><ClientList /></ProtectedRoute>
+                } />
+                <Route path="/clients/:phone" element={
+                  <ProtectedRoute adminOnly><ClientDetail /></ProtectedRoute>
                 } />
                 <Route path="/prompt" element={
                   <ProtectedRoute adminOnly><PromptEditor /></ProtectedRoute>

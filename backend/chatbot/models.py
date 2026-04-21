@@ -94,6 +94,25 @@ class ClientIntent(models.Model):
         return f'{self.phone or self.conversation.session_id} - {self.tipo_propiedad} {self.operacion}'
 
 
+class PropertyInterest(models.Model):
+    conversation = models.ForeignKey(
+        ChatConversation, on_delete=models.CASCADE, related_name='interested_properties'
+    )
+    property = models.ForeignKey(
+        'properties.Property', on_delete=models.CASCADE, related_name='client_interests'
+    )
+    first_shown_at = models.DateTimeField(auto_now_add=True)
+    last_shown_at = models.DateTimeField(auto_now=True)
+    shown_count = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = ('conversation', 'property')
+        ordering = ['-last_shown_at']
+
+    def __str__(self):
+        return f'{self.conversation.session_id} → {self.property_id} (×{self.shown_count})'
+
+
 class SystemPrompt(models.Model):
     content = models.TextField()
     updated_at = models.DateTimeField(auto_now=True)
