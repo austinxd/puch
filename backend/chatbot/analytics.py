@@ -17,10 +17,17 @@ def normalize_phone(phone):
     return re.sub(r'\D', '', phone or '')
 
 
-def _property_summary(prop):
+def _property_summary(prop, request=None):
     if prop is None:
         return None
     image = prop.images.first() if hasattr(prop, 'images') else None
+    image_url = None
+    if image and image.image:
+        url = image.image.url
+        if request is not None:
+            image_url = request.build_absolute_uri(url)
+        else:
+            image_url = f"{settings.BASE_URL.rstrip('/')}{url}"
     return {
         'id': prop.id,
         'identificador': prop.identificador,
@@ -29,7 +36,7 @@ def _property_summary(prop):
         'tipologia': prop.tipologia,
         'precio': prop.precio,
         'moneda': prop.moneda,
-        'image_url': image.image.url if image and image.image else None,
+        'image_url': image_url,
     }
 
 logger = logging.getLogger(__name__)
@@ -236,7 +243,7 @@ class ClientListView(APIView):
             total_msgs = sum(msg_count_by_conv.get(cid, 0) for cid in conv_ids_phone)
 
             first_conv = intent_list_sorted[0].conversation
-            first_prop = _property_summary(first_conv.first_property)
+            first_prop = _property_summary(first_conv.first_property, request)
 
             row = {
                 'phone': phone,
@@ -318,7 +325,7 @@ class ClientDetailView(APIView):
                 'last_message_at': last_msg.get(cid),
                 'message_count': msg_counts.get(cid, 0),
                 'agent_name': conv.agent.name if conv.agent else None,
-                'first_property': _property_summary(conv.first_property),
+                'first_property': _property_summary(conv.first_property, request),
             })
 
         intents_payload = [
@@ -348,7 +355,7 @@ class ClientDetailView(APIView):
         agg = {}
         for pi in interests:
             entry = agg.setdefault(pi.property_id, {
-                'property': _property_summary(pi.property),
+                'property': _property_summary(pi.property, request),
                 'first_shown_at': pi.first_shown_at,
                 'last_shown_at': pi.last_shown_at,
                 'shown_count': 0,
